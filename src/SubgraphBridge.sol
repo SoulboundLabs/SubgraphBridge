@@ -1,91 +1,131 @@
 pragma solidity ^0.8.0;
 // SPDX-License-Identifier: MIT
 
-import "hardhat/console.sol";
 import "./dependencies/TheGraph/IController.sol";
 import "./dependencies/TheGraph/IStaking.sol";
 import "./dependencies/TheGraph/IDisputeManager.sol";
-import "./NewSubgraphBridgeHelpers.sol";
+import "./SubgraphBridgeHelpers.sol";
 
 //@title SubgraphBridge
 //@notice SubgraphBridge is a contract that allows us to bridge subgraph data from The Graph's Decentralized Network to Ethereum in a cryptoeconomically secure manner.
-contract NewSubgraphBridge is NewSubgraphBridgeHelpers {
-
+contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
     address public theGraphStaking;
     address public theGraphDisputeManager;
 
     // {block hash} -> {block number}
-    mapping (bytes32 => uint256) public pinnedBlocks;
+    mapping(bytes32 => uint256) public pinnedBlocks;
 
-    // {QueryBridgeID} -> {QueryBridge}
-    mapping (bytes32 => QueryBridge) public queryBridges;
+    // {SubgraphBridgeID} -> {SubgraphBridge}
+    mapping(bytes32 => SubgraphBridge) public subgraphBridges;
 
-    // {QueryBridgeID} -> {attestation.requestCID} -> {QueryBridgeProposals}
-    mapping (bytes32 => mapping (bytes32 => QueryBridgeProposals)) public queryBridgeProposals;
+    // {SubgraphBridgeID} -> {attestation.requestCID} -> {SubgraphBridgeProposals}
+    mapping(bytes32 => mapping(bytes32 => SubgraphBridgeProposals))
+        public subgraphBridgeProposals;
 
     // not yet implemented
-    // {QueryBridgeID} -> {attestation.requestCID} -> {block number}
-    mapping (bytes32 => mapping (bytes32 => uint256)) public bridgeConflictResolutionBlock;
+    // {SubgraphBridgeID} -> {attestation.requestCID} -> {block number}
+    mapping(bytes32 => mapping(bytes32 => uint256))
+        public bridgeConflictResolutionBlock;
 
-    // {QueryBridgeID} -> {requestCID} -> {responseData}
-    mapping (bytes32 => mapping (bytes32 => uint256)) public dataStreams;
+    // {SubgraphBridgeID} -> {requestCID} -> {responseData}
+    mapping(bytes32 => mapping(bytes32 => uint256)) public subgraphBridgeData;
 
     constructor(address staking, address disputeManager) {
         theGraphStaking = staking;
         theGraphDisputeManager = disputeManager;
     }
+
     // ============================================================
     // PUBLIC FUNCTIONS TO BE USED BY THE MASSES
     // ============================================================
 
     //@notice creates a query bridge
     //@dummy create a way to get subgraph query results back on chain
-    function createSubgraphBridge(QueryBridge memory queryBridge) public {
-        bytes32 queryBridgeID = _queryBridgeID(queryBridge);
-        queryBridges[queryBridgeID] = queryBridge;
-        console.log("created query bridge with id: ");
-        console.logBytes32(queryBridgeID);
+    function createSubgraphBridge(SubgraphBridge memory subgraphBridge) public {
+        bytes32 subgraphBridgeID = _subgraphBridgeID(subgraphBridge); // set the subgraphId to the hashed SubgraphBridge
+        subgraphBridges[subgraphBridgeID] = subgraphBridge;
     }
 
     // @notice, this function is used to provide an attestation for a query
     // @dummy, whoever calls this is providing the data for ur query
+    // @param blockNumber, the block number of the block that the request was made for
+    // @param query, the query that was made
+    // @param response, the response of the query
+    // @param subgraphBridgeID, the ID of the subgraph bridge
+    // @param calldata attestation, the attestation of the response
     function postSubgraphResponse(
         uint256 blockNumber,
         string calldata query,
         string calldata response,
-        bytes32 queryBridgeID,
+        bytes32 subgraphBridgeID,
         bytes calldata attestationData
     ) public {
         bytes32 pinnedBlockHash = blockhash(blockNumber);
-        if(pinnedBlocks[pinnedBlockHash] == 0) {
+        // If the block number -> blockhash isn't pinned, pin it
+        if (pinnedBlocks[pinnedBlockHash] == 0) {
             pinnedBlocks[pinnedBlockHash] = blockNumber;
         }
-        require(queryBridges[queryBridgeID].blockHashOffset > 0, "query bridge doesn't exist");
-        require(_queryMatchesBridge(query, queryBridgeID), "query doesn't fit template");
-        
-        IDisputeManager.Attestation memory attestation = _parseAttestation(attestationData);
-        require(_queryAndResponseMatchAttestation(response, attestation), "query/response != attestation");
+        require(
+            subgraphBridges[subgraphBridgeID].blockHashOffset > 0,
+            "query bridge doesn't exist"
+        );
+
+        IDisputeManager.Attestation memory attestation = _parseAttestation(
+            attestationData
+        );
+        require(
+            _queryAndResponseMatchAttestation(
+                blockhash(blockNumber),
+                subgraphBridgeID,
+                response,
+                attestation
+            ),
+            "query/response != attestation"
+        );
 
         // get indexer's slashable stake from staking contract
-        address attestationIndexer = IDisputeManager(theGraphDisputeManager).getAttestationIndexer(attestation);
-        uint256 indexerStake = IStaking(theGraphStaking).getIndexerStakedTokens(attestationIndexer);
+        address attestationIndexer = IDisputeManager(theGraphDisputeManager)
+            .getAttestationIndexer(attestation);
+        uint256 indexerStake = IStaking(theGraphStaking).getIndexerStakedTokens(
+            attestationIndexer
+        );
         require(indexerStake > 0, "indexer doesn't have slashable stake");
 
-        QueryBridgeProposals storage proposals = queryBridgeProposals[queryBridgeID][attestation.requestCID];
+        SubgraphBridgeProposals storage proposals = subgraphBridgeProposals[
+            subgraphBridgeID
+        ][attestation.requestCID];
 
-        if (proposals.stake[attestation.responseCID].totalStake.attestationStake == 0) {
-            console.log("proposal count++");
+        if (
+            proposals
+                .stake[attestation.responseCID]
+                .totalStake
+                .attestationStake == 0
+        ) {
             proposals.proposalCount = proposals.proposalCount + 1;
 
-            uint16 blockHashOffset = queryBridges[queryBridgeID].blockHashOffset;
-            bytes32 queryBlockHash = _bytes32FromStringWithOffset(query, blockHashOffset+2); // todo: why +2?
+            uint16 blockHashOffset = subgraphBridges[subgraphBridgeID]
+                .blockHashOffset;
+            bytes32 queryBlockHash = _bytes32FromStringWithOffset(
+                query,
+                blockHashOffset + 2
+            ); // todo: why +2?
             require(pinnedBlocks[queryBlockHash] > 0, "block hash unpinned");
         }
 
         // update stake values
-        proposals.stake[attestation.responseCID].accountStake[attestationIndexer].attestationStake = indexerStake;
-        proposals.stake[attestation.responseCID].totalStake.attestationStake = proposals.stake[attestation.responseCID].totalStake.attestationStake + indexerStake;
-        proposals.totalStake.attestationStake = proposals.totalStake.attestationStake + indexerStake;
+        proposals
+            .stake[attestation.responseCID]
+            .accountStake[attestationIndexer]
+            .attestationStake = indexerStake;
+        proposals.stake[attestation.responseCID].totalStake.attestationStake =
+            proposals
+                .stake[attestation.responseCID]
+                .totalStake
+                .attestationStake +
+            indexerStake;
+        proposals.totalStake.attestationStake =
+            proposals.totalStake.attestationStake +
+            indexerStake;
     }
 
     //@notice, this function allows you to use a non disputed query response after the dispute period has ended
@@ -97,30 +137,41 @@ contract NewSubgraphBridge is NewSubgraphBridgeHelpers {
         string calldata response,
         bytes32 subgraphBridgeId,
         bytes calldata attestationData // contains cid of response and request
-     ) public {
-        uint16 blockHashOffset = queryBridges[subgraphBridgeId].blockHashOffset+2;
+    ) public {
+        uint16 blockHashOffset = subgraphBridges[subgraphBridgeId]
+            .blockHashOffset + 2;
         bytes32 _blockhash = blockhash(blockNumber);
-        IDisputeManager.Attestation memory attestation = _parseAttestation(attestationData);
+        IDisputeManager.Attestation memory attestation = _parseAttestation(
+            attestationData
+        );
         bytes32 requestCID = attestation.requestCID;
         // bytes32 queryBlockHash = _bytes32FromStringWithOffset(blockHashOffset); // todo: why +2?
-        // bytes32 queryTemplateHash = queryBridges[subgraphBridgeId].queryTemplate;
-        // bytes32 subgraphDeploymentID = queryBridges[subgraphBridgeId].subgraphDeploymentID;
-        // uint16 responseDataOffset = queryBridges[subgraphBridgeId].responseDataOffset;
-        uint8 proposalFreezePeriod = queryBridges[subgraphBridgeId].proposalFreezePeriod;
-        uint8 minimumSlashableGRT = queryBridges[subgraphBridgeId].minimumSlashableGRT;
+        // bytes32 queryTemplateHash = subgraphBridges[subgraphBridgeId].queryTemplate;
+        // bytes32 subgraphDeploymentID = subgraphBridges[subgraphBridgeId].subgraphDeploymentID;
+        // uint16 responseDataOffset = subgraphBridges[subgraphBridgeId].responseDataOffset;
+        uint8 proposalFreezePeriod = subgraphBridges[subgraphBridgeId]
+            .proposalFreezePeriod;
+        uint8 minimumSlashableGRT = subgraphBridges[subgraphBridgeId]
+            .minimumSlashableGRT;
 
-        require(pinnedBlocks[_blockhash] + proposalFreezePeriod <= block.number, "proposal still frozen");
-        //@notice we need to check that the request is valid
-        // we are doing this by checking if the query template + blockhash == responseCID from the attestation
-        require(_queryMatchesBridge(_blockhash, subgraphBridgeId), "query doesn't fit template");
+        require(
+            pinnedBlocks[_blockhash] + proposalFreezePeriod <= block.number,
+            "proposal still frozen"
+        );
 
-        QueryBridgeProposals storage proposals = queryBridgeProposals[subgraphBridgeId][requestCID];
+        SubgraphBridgeProposals storage proposals = subgraphBridgeProposals[
+            subgraphBridgeId
+        ][requestCID];
         require(proposals.proposalCount == 1, "proposalCount must be 1");
 
         // TODO: CHECK THIS IS WORKIN RIGHT
         bytes32 responseCID = keccak256(abi.encodePacked(response));
-        
-        require(proposals.stake[responseCID].totalStake.attestationStake > minimumSlashableGRT, "not enough stake");
+
+        require(
+            proposals.stake[responseCID].totalStake.attestationStake >
+                minimumSlashableGRT,
+            "not enough stake"
+        );
 
         _extractData(subgraphBridgeId, requestCID, response);
     }
@@ -129,50 +180,85 @@ contract NewSubgraphBridge is NewSubgraphBridgeHelpers {
     // INTERNAL AND HELPER FUNCTIONS
     // ============================================================
     function pinBlockHash(uint256 blockNumber) public {
+        require(
+            pinnedBlocks[blockhash(blockNumber)] == 0,
+            "pinBlockHash: already pinned!"
+        );
         pinnedBlocks[blockhash(blockNumber)] = blockNumber;
     }
 
-    function _queryMatchesBridge(
-        string calldata query,
-        bytes32 queryBridgeID
-    ) public view returns (bool) {
-        QueryBridge memory bridge = queryBridges[queryBridgeID];
-        return (_generateQueryTemplateHash(query, bridge.blockHashOffset, bridge.queryVariables) == bridge.queryTemplate);
-    }
-    function _extractData(bytes32 queryBridgeID, bytes32 requestCID, string calldata response) private {
-        uint responseT = uint(queryBridges[queryBridgeID].responseDataType);
-        console.log(responseT);
-        if (queryBridges[queryBridgeID].responseDataType == BridgeDataType.UINT) {
-            console.log("it's a uint response");
-            dataStreams[queryBridgeID][requestCID] = _uintFromString(response, queryBridges[queryBridgeID].responseDataOffset);
-            string memory s = response[queryBridges[queryBridgeID].responseDataOffset:];
-            console.log(s);
+    function _extractData(
+        bytes32 subgraphBridgeID,
+        bytes32 requestCID,
+        string calldata response
+    ) private {
+        uint256 responseT = uint256(
+            subgraphBridges[subgraphBridgeID].responseDataType
+        );
+        if (
+            subgraphBridges[subgraphBridgeID].responseDataType ==
+            BridgeDataType.UINT
+        ) {
+            subgraphBridgeData[subgraphBridgeID][requestCID] = _uintFromString(
+                response,
+                subgraphBridges[subgraphBridgeID].responseDataOffset
+            );
+            string memory s = response[subgraphBridges[subgraphBridgeID]
+                .responseDataOffset:];
         }
     }
 
+    /**
+     *@notice this function checks if a query for a subgraphBridgeId matches the attestation
+     *@param blockHash, the blockhash we are serving data for
+     *@param subgraphBridgeId, the subgraph bridge id
+     *@param response, the response from the subgraph query
+     *@param attestation, the attestation from the indexer
+     *@return bool, returns true if everything matches, fails otherwise
+     */
     function _queryAndResponseMatchAttestation(
-        // string calldata query, 
-        string calldata response, 
+        bytes32 blockHash,
+        bytes32 subgraphBridgeID,
+        string calldata response,
         IDisputeManager.Attestation memory attestation
     ) internal pure returns (bool) {
-        // todo: figure out why keccak256(query) doesn't match attestation.requestCID
-        // require(attestation.requestCID == keccak256(abi.encodePacked(query)), "query does not match attestation requestCID");
-        return (attestation.responseCID == keccak256(abi.encodePacked(response)));
+        require(
+            attestation.requestCID == _generateQueryRequestCID(blockHash),
+            "_queryAndResponseMatchAttestation: RequestCID Doesn't match"
+        );
+        require(
+            attestation.responseCID == keccak256(abi.encodePacked(response)),
+            "_queryAndResponseMatchAttestation: ResponseCID Doesn't Match"
+        );
+        require(
+            subgraphBridges[subgraphBridgeID].subgraphDeploymentID ==
+                attestation.subgraphDeploymentID,
+            "_queryAndResponseMatchAttestation: SubgraphDeploymentID Doesn't Match"
+        );
+        return true;
     }
 
     /**
      * @dev Parse the bytes attestation into a struct from `_data`.
      * @return Attestation struct
      */
-    function _parseAttestation(bytes memory _data) internal pure returns (IDisputeManager.Attestation memory) {
+    function _parseAttestation(bytes memory _data)
+        internal
+        pure
+        returns (IDisputeManager.Attestation memory)
+    {
         // Check attestation data length
-        require(_data.length == ATTESTATION_SIZE_BYTES, "Attestation must be 161 bytes long");
+        require(
+            _data.length == ATTESTATION_SIZE_BYTES,
+            "Attestation must be 161 bytes long"
+        );
 
         // Decode receipt
-        (bytes32 requestCID, bytes32 responseCID, bytes32 subgraphDeploymentID) = abi.decode(
-            _data,
-            (bytes32, bytes32, bytes32)
-        );
+        (
+            bytes32 requestCID,
+            bytes32 responseCID,
+            bytes32 subgraphDeploymentID
+        ) = abi.decode(_data, (bytes32, bytes32, bytes32));
 
         // Decode signature
         // Signature is expected to be in the order defined in the Attestation struct
@@ -180,38 +266,40 @@ contract NewSubgraphBridge is NewSubgraphBridgeHelpers {
         bytes32 s = _toBytes32(_data, SIG_S_OFFSET);
         uint8 v = _toUint8(_data, SIG_V_OFFSET);
 
-        return IDisputeManager.Attestation(requestCID, responseCID, subgraphDeploymentID, r, s, v);
+        return
+            IDisputeManager.Attestation(
+                requestCID,
+                responseCID,
+                subgraphDeploymentID,
+                r,
+                s,
+                v
+            );
     }
 
-    function _generateQueryTemplateHash(
-        string calldata query,
-        uint256 blockHashOffset,
-        uint16[2] memory queryVariables
-    ) internal view returns (bytes32) {
-
-        uint8 qv0Idx = uint8(queryVariables[0] >> 8);
-        uint8 qv0Length = _lengthForQueryVariable(qv0Idx, BridgeDataType(uint8(queryVariables[0])), query);
-        uint8 qv1Idx = uint8(queryVariables[1] >> 8) + qv0Idx + qv0Length;
-        uint8 qv1Length = _lengthForQueryVariable(qv1Idx, BridgeDataType(uint8(queryVariables[1])), query);
-
-        bytes memory strippedQTemplate = bytes.concat(
-            bytes(query)[:blockHashOffset],
-            bytes(query)[blockHashOffset+66:qv0Idx]
-        );
-
-        if (qv1Idx == 0) {
-            strippedQTemplate = bytes.concat(
-                strippedQTemplate,
-                bytes(query)[qv0Idx+qv0Length:]
+    /**
+     *@dev this function generates (WHAT SHOULD BE) the requestCID for the query at a blocknumber
+     *@param _blockhash, the blockchash we are querying
+     *@param _subgraphBridgeId, the id of the subgraphBridge
+     *@return the keccak256 hash of the request
+     */
+    function _generateQueryRequestCID(
+        bytes32 _blockhash,
+        bytes32 _subgraphBridgeId
+    ) public view returns (bytes32) {
+        SubgraphBridge memory bridge = subgraphBridges[_subgraphBridgeId]
+            .queryTemplate;
+        bytes memory queryPreBlockHash = bytes(bridge.queryTemplate)[:bridge
+            .blockHashOffset];
+        bytes memory queryPostBlockHash = bytes(bridge.queryTemplate)[bridge
+            .blockHashOffset:];
+        return
+            keccak256(
+                bytes.concat(
+                    queryPreBlockHash,
+                    bytes(_blockhash),
+                    queryPostBlockHash
+                )
             );
-        } else {
-            strippedQTemplate = bytes.concat(
-                strippedQTemplate,
-                bytes(query)[qv0Idx+qv0Length:qv1Idx],
-                bytes(query)[qv1Idx+qv1Length:]
-            );
-        }
-
-        return keccak256(abi.encode(strippedQTemplate));
     }
 }
