@@ -211,7 +211,7 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
     /**
      *@notice this function checks if a query for a subgraphBridgeId matches the attestation
      *@param blockHash, the blockhash we are serving data for
-     *@param subgraphBridgeId, the subgraph bridge id
+     *@param subgraphBridgeID, the subgraph bridge id
      *@param response, the response from the subgraph query
      *@param attestation, the attestation from the indexer
      *@return bool, returns true if everything matches, fails otherwise
@@ -221,9 +221,10 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         bytes32 subgraphBridgeID,
         string calldata response,
         IDisputeManager.Attestation memory attestation
-    ) internal pure returns (bool) {
+    ) internal view returns (bool) {
         require(
-            attestation.requestCID == _generateQueryRequestCID(blockHash),
+            attestation.requestCID ==
+                _generateQueryRequestCID(blockHash, subgraphBridgeID),
             "_queryAndResponseMatchAttestation: RequestCID Doesn't match"
         );
         require(
@@ -287,19 +288,19 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         bytes32 _blockhash,
         bytes32 _subgraphBridgeId
     ) public view returns (bytes32) {
-        SubgraphBridge memory bridge = subgraphBridges[_subgraphBridgeId]
-            .queryTemplate;
-        bytes memory queryPreBlockHash = bytes(bridge.queryTemplate)[:bridge
-            .blockHashOffset];
-        bytes memory queryPostBlockHash = bytes(bridge.queryTemplate)[bridge
-            .blockHashOffset:];
+        SubgraphBridge storage bridge = subgraphBridges[_subgraphBridgeId];
+
+        //NOTE: TEST IF THE substring function is inclusive of the stop index
+        uint256 firstLen = bridge.blockHashOffset - 1; // length from start-> block
+        string memory firstChunk = substring(bridge.queryTemplate, 0, firstLen);
+        string memory secondChunk = substring(
+            bridge.queryTemplate,
+            bridge.blockHashOffset + BLOCKHASH_LENGTH,
+            strlen(bridge.queryTemplate)
+        );
         return
             keccak256(
-                bytes.concat(
-                    queryPreBlockHash,
-                    bytes(_blockhash),
-                    queryPostBlockHash
-                )
+                bytes(abi.encodePacked(firstChunk, _blockhash, secondChunk))
             );
     }
 }
