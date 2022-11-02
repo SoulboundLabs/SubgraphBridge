@@ -70,8 +70,12 @@ contract SubgraphBridgeManagerHelpers {
         address stakingToken; // erc20 token for external staking
     }
 
-    function hashQueryTemplate(string memory queryTemplate) public view {
-        bytes32 queryTemplateHash = keccak256(abi.encode(queryTemplate));
+    function hashQueryTemplate(string memory queryTemplate)
+        public
+        pure
+        returns (bytes32)
+    {
+        return keccak256(abi.encode(queryTemplate));
     }
 
     function _subgraphBridgeID(SubgraphBridge memory subgraphBridge)
@@ -82,45 +86,11 @@ contract SubgraphBridgeManagerHelpers {
         return keccak256(abi.encode(subgraphBridge));
     }
 
-    function _lengthForQueryVariable(
-        uint8 qVariableIdx,
-        BridgeDataType qVariableType,
-        string calldata query
-    ) public view returns (uint8) {
-        if (qVariableType == BridgeDataType.ADDRESS) {
-            return 42;
-        } else if (qVariableType == BridgeDataType.BYTES32) {
-            return 66;
-        } else {
-            // uint, string
-            return _dynamicLengthForQueryVariable(qVariableIdx, bytes(query));
-        }
-    }
-
-    function _dynamicLengthForQueryVariable(
-        uint8 qVariableIdx,
-        bytes calldata query
-    ) public view returns (uint8) {
-        uint8 length = 0;
-        bool shouldEscape = false;
-        while (!shouldEscape) {
-            bytes1 char = query[qVariableIdx + length];
-            shouldEscape = (char == 0x7D ||
-                char == 0x2C ||
-                char == 0x29 ||
-                char == 0x22); // ,})"
-            if (!shouldEscape) {
-                length += 1;
-            }
-        }
-
-        return length;
-    }
-
-    function _bytes32FromStringWithOffset(
-        string calldata fullString,
-        uint16 dataOffset
-    ) public view returns (bytes32) {
+    function _bytes32FromString(string calldata fullString, uint16 dataOffset)
+        public
+        pure
+        returns (bytes32)
+    {
         string memory blockHashSlice = string(
             fullString[dataOffset:dataOffset + 64]
         );
@@ -133,7 +103,6 @@ contract SubgraphBridgeManagerHelpers {
         returns (uint256)
     {
         (uint256 val, ) = _uintFromByteString(bytes(str), offset);
-        string memory s = str[offset:];
         return val;
     }
 

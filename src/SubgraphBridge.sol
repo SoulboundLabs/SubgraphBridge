@@ -105,7 +105,7 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
 
             uint16 blockHashOffset = subgraphBridges[subgraphBridgeID]
                 .blockHashOffset;
-            bytes32 queryBlockHash = _bytes32FromStringWithOffset(
+            bytes32 queryBlockHash = _bytes32FromString(
                 query,
                 blockHashOffset + 2
             ); // todo: why +2?
@@ -138,8 +138,8 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         bytes32 subgraphBridgeId,
         bytes calldata attestationData // contains cid of response and request
     ) public {
-        uint16 blockHashOffset = subgraphBridges[subgraphBridgeId]
-            .blockHashOffset + 2;
+        // uint16 blockHashOffset = subgraphBridges[subgraphBridgeId]
+        // .blockHashOffset + 2;
         bytes32 _blockhash = blockhash(blockNumber);
         IDisputeManager.Attestation memory attestation = _parseAttestation(
             attestationData
@@ -173,6 +173,7 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
             "not enough stake"
         );
 
+        //NOTE: REMOVE THIS LATER / REFACTOR?
         _extractData(subgraphBridgeId, requestCID, response);
     }
 
@@ -187,24 +188,38 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         pinnedBlocks[blockhash(blockNumber)] = blockNumber;
     }
 
+    // NOTE: REMOVE THIS LATER / REFACTOR?
     function _extractData(
         bytes32 subgraphBridgeID,
         bytes32 requestCID,
         string calldata response
     ) private {
-        uint256 responseT = uint256(
-            subgraphBridges[subgraphBridgeID].responseDataType
-        );
-        if (
-            subgraphBridges[subgraphBridgeID].responseDataType ==
-            BridgeDataType.UINT
-        ) {
+        //NOTE: THIS FUNCTION ISN'T DONE. NEED TO HANDLE ALL DATA TYPES
+        BridgeDataType _type = subgraphBridges[subgraphBridgeID]
+            .responseDataType;
+
+        if (_type == BridgeDataType.UINT) {
             subgraphBridgeData[subgraphBridgeID][requestCID] = _uintFromString(
                 response,
                 subgraphBridges[subgraphBridgeID].responseDataOffset
             );
-            string memory s = response[subgraphBridges[subgraphBridgeID]
-                .responseDataOffset:];
+        } else if (_type == BridgeDataType.ADDRESS) {
+            //DO SOMETHING ELSE
+            /*
+            subgraphBridgeData[subgraphBridgeID][requestCID] = _addressFromString(
+                response,
+                subgraphBridges[subgraphBridgeID].responseDataOffset
+            );
+            */
+        } else if (_type == BridgeDataType.BYTES32) {
+            //DO ANOTHER THING
+            //NOTE: I'M NOT SURE IF THIS IS RIGHT OR NOT??
+            subgraphBridgeData[subgraphBridgeID][requestCID] = uint256(
+                _bytes32FromString(
+                    response,
+                    subgraphBridges[subgraphBridgeID].responseDataOffset
+                )
+            );
         }
     }
 
