@@ -22,7 +22,6 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
     mapping(bytes32 => mapping(bytes32 => SubgraphBridgeProposals))
         public subgraphBridgeProposals;
 
-    // not yet implemented
     // {SubgraphBridgeID} -> {attestation.requestCID} -> {block number}
     mapping(bytes32 => mapping(bytes32 => uint256))
         public bridgeConflictResolutionBlock;
@@ -55,9 +54,9 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
     // @param calldata attestation, the attestation of the response
     function postSubgraphResponse(
         uint256 blockNumber,
+        bytes32 subgraphBridgeID,
         string calldata query,
         string calldata response,
-        bytes32 subgraphBridgeID,
         bytes calldata attestationData
     ) public {
         bytes32 pinnedBlockHash = blockhash(blockNumber);
@@ -188,7 +187,6 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         pinnedBlocks[blockhash(blockNumber)] = blockNumber;
     }
 
-    // NOTE: REMOVE THIS LATER / REFACTOR?
     function _extractData(
         bytes32 subgraphBridgeID,
         bytes32 requestCID,
@@ -308,10 +306,11 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         //NOTE: TEST IF THE substring function is inclusive of the stop index
         uint256 firstLen = bridge.blockHashOffset - 1; // length from start-> block
         string memory firstChunk = substring(bridge.queryTemplate, 0, firstLen);
+        uint256 queryTemplateLen = strlen(bridge.queryTemplate);
         string memory secondChunk = substring(
             bridge.queryTemplate,
             bridge.blockHashOffset + BLOCKHASH_LENGTH,
-            strlen(bridge.queryTemplate)
+            queryTemplateLen
         );
         return
             keccak256(
