@@ -21,8 +21,12 @@ contract SubgraphBridgeTest is Test {
         );
     }
 
-    // function testIncrement() public {
-    //     counter.increment();
-    //     assertEq(counter.number(), 1);
-    // }
+    function testPinBlockHash() public {
+        uint256 blockNum = block.number;
+        bridge.pinBlockHash(blockNum);
+        vm.expectRevert(bytes("pinBlockHash: already pinned!"));
+        bridge.pinBlockHash(blockNum);
+        bytes32 blockHash = blockhash(blockNum);
+        emit log_uint(bridge.pinnedBlocks(blockHash));
+    }
 }
