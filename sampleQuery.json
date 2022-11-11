@@ -1,0 +1,3 @@
+"query":"{tokens(first:1,block:{hash:\"0xc63eaefe604acb284fc4eee85e6dca8676f8c2c354503965c55b2b394713a594\"}){decimals}}"
+
+"attestation": "{"requestCID":"0xf61499b5e9584435bda7432da624fc1754823998c1753f1fad9b95ec276ba6a3","responseCID":"0x2b2da35508e81c5e41debcbc8fb26c540fde114c14f6cb95218eb36dbf0beb4a","subgraphDeploymentID":"0xd2d657dcc8750bd756c4fb2dcd8b262b4052b12c89d58f0b1e64df5e99df559d","v":28,"r":"0x21f6f11d3158baeb94577d7d2fc97953edec4f6922a2b9f308f2a93dca773a0c","s":"0x6c40d1d7f1bfc190eb187cbdb5db60181c855312ccde12743412853abb2eee45"}"
