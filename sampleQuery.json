@@ -1,3 +1,82 @@
 "query":"{tokens(first:1,block:{hash:\"0xc63eaefe604acb284fc4eee85e6dca8676f8c2c354503965c55b2b394713a594\"}){decimals}}"
 
 "attestation": "{"requestCID":"0xf61499b5e9584435bda7432da624fc1754823998c1753f1fad9b95ec276ba6a3","responseCID":"0x2b2da35508e81c5e41debcbc8fb26c540fde114c14f6cb95218eb36dbf0beb4a","subgraphDeploymentID":"0xd2d657dcc8750bd756c4fb2dcd8b262b4052b12c89d58f0b1e64df5e99df559d","v":28,"r":"0x21f6f11d3158baeb94577d7d2fc97953edec4f6922a2b9f308f2a93dca773a0c","s":"0x6c40d1d7f1bfc190eb187cbdb5db60181c855312ccde12743412853abb2eee45"}"
+{
+          "method": "POST",
+          "url": "https://gateway.thegraph.com/api/ca477456f6867aa73e24582c464e4e5f/deployments/id/QmcXfthvS3CWztafbY22eGzDG1pfjwYss6NmCak31jGnBE",
+          "httpVersion": "http/2.0",
+          "headers": [
+            {
+              "name": ":authority",
+              "value": "gateway.thegraph.com"
+            },
+            {
+              "name": ":method",
+              "value": "POST"
+            },
+            {
+              "name": ":path",
+              "value": "/api/ca477456f6867aa73e24582c464e4e5f/deployments/id/QmcXfthvS3CWztafbY22eGzDG1pfjwYss6NmCak31jGnBE"
+            },
+            {
+              "name": ":scheme",
+              "value": "https"
+            },
+            {
+              "name": "accept",
+              "value": "application/json, multipart/mixed"
+            },
+            {
+              "name": "accept-encoding",
+              "value": "gzip, deflate, br"
+            },
+            {
+              "name": "accept-language",
+              "value": "en-US,en;q=0.5"
+            },
+            {
+              "name": "content-length",
+              "value": "144"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "origin",
+              "value": "https://thegraph.com"
+            },
+            {
+              "name": "referer",
+              "value": "https://thegraph.com/"
+            },
+            {
+              "name": "sec-fetch-dest",
+              "value": "empty"
+            },
+            {
+              "name": "sec-fetch-mode",
+              "value": "cors"
+            },
+            {
+              "name": "sec-fetch-site",
+              "value": "same-site"
+            },
+            {
+              "name": "sec-gpc",
+              "value": "1"
+            },
+            {
+              "name": "user-agent",
+              "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36"
+            }
+          ],
+          "queryString": [],
+          "cookies": [],
+          "headersSize": -1,
+          "bodySize": 144,
+          "postData": {
+            "mimeType": "application/json",
+            "text": "{\"query\":\"{\\n  tokens(first: 1, block: {hash:\\\"0xc63eaefe604acb284fc4eee85e6dca8676f8c2c354503965c55b2b394713a594\\\" }) {\\n    decimals\\n  }\\n}\"}"
+          }
+        }

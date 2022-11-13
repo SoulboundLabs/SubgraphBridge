@@ -72,54 +72,30 @@ contract SubgraphBridgeTest is Test {
         emit log_uint(bridge.pinnedBlocks(blockHash));
     }
 
-    function substring(
-        string memory str,
-        uint256 startIndex,
-        uint256 endIndex
-    ) public pure returns (string memory res) {
-        bytes memory strBytes = bytes(str);
-        bytes memory result = new bytes(endIndex - startIndex);
-        for (uint256 i = startIndex; i < endIndex; i++) {
-            result[i - startIndex] = strBytes[i];
-        }
-        res = string(result);
-    }
-
-    function strlen(string memory s) internal pure returns (uint256) {
-        uint256 len;
-        uint256 i = 0;
-        uint256 bytelength = bytes(s).length;
-        for (len = 0; i < bytelength; len++) {
-            bytes1 b = bytes(s)[i];
-            if (b < 0x80) {
-                i += 1;
-            } else if (b < 0xE0) {
-                i += 2;
-            } else if (b < 0xF0) {
-                i += 3;
-            } else if (b < 0xF8) {
-                i += 4;
-            } else if (b < 0xFC) {
-                i += 5;
-            } else {
-                i += 6;
-            }
-        }
-        return len;
-    }
-
+    //TODO: Figure out how the query is being generated so we can format query -> whatever needs to be hashed to get the requestCID
     function testCreateRequestCID() public {
         bytes32 requestCID = 0xf61499b5e9584435bda7432da624fc1754823998c1753f1fad9b95ec276ba6a3;
-        emit log_bytes32(requestCID);
+        bytes32 generatedRequestCID = bridge._generateQueryRequestCID(defaultBlockHash, bridgeId);
+        assertEq(requestCID, generatedRequestCID);
+    }
 
-        // emit log_bytes32(bridgeId);
-        // (string memory _queryTemplate,,,,,,,,,,,) = bridge.subgraphBridges(bridgeId);
-        // emit log_string(_queryTemplate);
-        string memory blockHashString = vm.toString(defaultBlockHash);
-        string memory _query = bridge.createQuery(blockHashString, bridgeId);
-        emit log_string(_query);
-        // bytes32 generatedRequestCID = bridge._generateQueryRequestCID(defaultBlockHash, bridgeId);
-        // emit log_bytes32(generatedRequestCID);
-        // assertEq(bridge._generateQueryRequestCID(defaultBlockHash, bridgeId), requestCID);
-      }
+    function testQueryAndResponseMatchAttestation() public {
+      // do something
+    }
+
+    function testParseAttestation() public {
+        // do something
+    }
+
+    function testExtractData() public {
+        // do something
+    }
+
+    function testCertifySubgraphResponse() public {
+        // do something
+    }
+
+    function testPostSubgraphResponse() public {
+        // do something
+    }
 }

@@ -291,23 +291,6 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
             );
     }
 
-    function createQuery(
-        string memory _blockhash,
-        bytes32 _subgraphBridgeId
-    )  public view returns (string memory ret) {
-        SubgraphBridge storage bridge = subgraphBridges[_subgraphBridgeId];
-
-        uint256 firstLen = bridge.blockHashOffset; // length from start-> block
-        string memory firstChunk = substring(bridge.queryTemplate, 0, firstLen);
-        uint256 queryTemplateLen = strlen(bridge.queryTemplate);
-        string memory secondChunk = substring(
-            bridge.queryTemplate,
-            bridge.blockHashOffset,
-            queryTemplateLen
-        );
-        ret = string(abi.encodePacked(firstChunk, _blockhash, secondChunk));
-      }
-
     /**
      *@dev this function generates (WHAT SHOULD BE) the requestCID for the query at a blocknumber
      *@param _blockhash, the blockchash we are querying
@@ -320,13 +303,13 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
     ) public view returns (bytes32) {
         SubgraphBridge storage bridge = subgraphBridges[_subgraphBridgeId];
 
-        uint256 firstLen = bridge.blockHashOffset - 1; // length from start-> block
+        uint256 firstLen = bridge.blockHashOffset; // length from start-> block
         string memory firstChunk = substring(bridge.queryTemplate, 0, firstLen);
         uint256 queryTemplateLen = strlen(bridge.queryTemplate);
         string memory secondChunk = substring(
             bridge.queryTemplate,
             bridge.blockHashOffset,
-            queryTemplateLen-1
+            queryTemplateLen
         );
         return
             keccak256(
