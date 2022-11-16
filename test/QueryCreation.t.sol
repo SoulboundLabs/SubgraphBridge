@@ -25,6 +25,7 @@ contract QueryCreation is Test {
 
     bytes public totalQueryHex2 = hex'7b227175657279223a227b5c6e2020626f6e6465724164646564732866697273743a2031302c20626c6f636b3a207b686173683a205c223078356231646330313366393238373366653930313766323836313265663637613562313431653833663735663033366439636237633865316238656638303562655c227d29207b5c6e2020202069645c6e20207d5c6e7d5c6e222c227661726961626c6573223a7b7d7d';
 
+    // @dev I was just testing to see how strings are handled when abi encoding.
     function testKeccakStrings() public {
         string memory result = "request";
 
@@ -38,20 +39,6 @@ contract QueryCreation is Test {
 
         assertEq(wordHash, 0x34bba2d182f6f70dcdc5d2962126622c60729eea6534226f87b35dd2bd3045d4);
     }
-
-    // function testCreatingQuery() public {
-    //     bytes memory blockHashBytes = hex'3078333962393363633936396633616336323062383936613132386565333232646262613265373435666232643662386261373231386132373562393239363634386f';
-    //
-    //     bytes memory combined = bytes.concat(firstChunk,blockHashBytes,lastChunk);
-    //
-    //     bytes32 combinedHash = keccak256(combined);
-    //
-    //     bytes memory onlineCombined = hex'7b227175657279223a227b5c6e2020626c6f636b732866697273743a2031302c20626c6f636b3a207b686173683a205c223078333962393363633936396633616336323062383936613132386565333232646262613265373435666232643662386261373231386132373562393239363634386f5c227d29207b5c6e2020202069645c6e202020206e756d6265725c6e20207d5c6e7d5c6e222c227661726961626c6573223a7b7d7d';
-    //
-    //     assertEq(combined, onlineCombined);
-    //
-    //     assertEq(combinedHash, keccak256(onlineCombined));
-    // }
 
     function testActualSubgraphQueries() public {
       bytes memory bytesBlockHash1 = toHexBytes(blockHash1);
