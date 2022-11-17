@@ -150,6 +150,7 @@ contract SubgraphBridgeTest is Test {
         bridgeId,
         attestationBytes);
 
+      // TODO: Create some new queries with other data types.
       assert(bridge.subgraphBridgeData(bridgeId, requestCID1) != 0);
     }
 

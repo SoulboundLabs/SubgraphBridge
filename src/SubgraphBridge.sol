@@ -31,6 +31,10 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
 
     event SubgraphBridgeCreation(address bridgeCreator, bytes32 subgraphBridgeId, bytes32 subgraphDeploymentID);
 
+    event SubgraphResponseAdded(address queryBridger, bytes32 subgraphBridgeID, bytes32 subgraphDeploymentID, string response, bytes attestationData);
+    
+    event QueryResultFinalized(bytes32 subgraphBridgeID, bytes32 requestCID, string response);
+
     constructor(address staking, address disputeManager) {
         theGraphStaking = staking;
         theGraphDisputeManager = disputeManager;
@@ -121,6 +125,8 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         proposals.totalStake.attestationStake =
             proposals.totalStake.attestationStake +
             indexerStake;
+
+        emit SubgraphResponseAdded(msg.sender, subgraphBridgeID, attestation.subgraphDeploymentID, response, attestationData);
     }
 
     //@notice, this function allows you to use a non disputed query response after the dispute period has ended
@@ -169,8 +175,9 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
             "not enough stake"
         );
 
-        //NOTE: REMOVE THIS LATER / REFACTOR?
         _extractData(subgraphBridgeId, requestCID, response);
+
+        emit QueryResultFinalized(subgraphBridgeId, requestCID, response);
     }
 
     // ============================================================
