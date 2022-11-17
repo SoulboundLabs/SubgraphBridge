@@ -64,7 +64,7 @@ contract SubgraphBridgeTest is Test {
 
         bridgeId = bridge._subgraphBridgeID(sampleBridge);
 
-        emit log_bytes32(bridgeId);
+        // emit log_bytes32(bridgeId);
 
         defaultBlockNumber = block.number;
     }
@@ -97,14 +97,19 @@ contract SubgraphBridgeTest is Test {
     }
 
     function testParseAttestation() public {
-        // do something
-        bytes memory attestationBytes = abi.encodePacked('{"requestCID":"0x200d785a4e650a6d55daec459392da7c1e22a3304710221a0b807e2260626aca","responseCID":"0x2ba2ff1138e3b6b95ca8ddc5fdeb67604ba15e35571f4e0adaa7b3a6e7d80284","subgraphDeploymentID":"0xe38339f1ed253e87deacd7d21ada20bb414fa9958d3ddd80f1e39aa724f76224","v":28,"r":"0xc67476e32e2121de62e78558392246c6b48e7ce505a051b40694ebf6a929bbb7","s":"0x2c3c887a657777cdf5f907fc48fc92f229a60ce9bad7b27f1ed4819dbaa7c38f"}');
+      bytes memory attestationBytes = abi.encodePacked(requestCID1, responseCID1, subgraphDeploymentId, r,s,v);
       IDisputeManager.Attestation memory attestation = IDisputeManager.Attestation(requestCID1, responseCID1, subgraphDeploymentId, r, s, v);
 
       bytes32 attestationHash = keccak256(abi.encode(attestation));
       bytes32 parsedAttestationHash = keccak256(abi.encode(bridge._parseAttestation(attestationBytes)));
 
       assertEq(attestationHash, parsedAttestationHash);
+
+      bytes memory rawHexAttestation = hex'200d785a4e650a6d55daec459392da7c1e22a3304710221a0b807e2260626aca2ba2ff1138e3b6b95ca8ddc5fdeb67604ba15e35571f4e0adaa7b3a6e7d80284e38339f1ed253e87deacd7d21ada20bb414fa9958d3ddd80f1e39aa724f76224c67476e32e2121de62e78558392246c6b48e7ce505a051b40694ebf6a929bbb72c3c887a657777cdf5f907fc48fc92f229a60ce9bad7b27f1ed4819dbaa7c38f1c';
+
+      bytes32 rawAttestationHash = keccak256(abi.encode(bridge._parseAttestation(rawHexAttestation)));
+
+      assertEq(attestationHash, rawAttestationHash);
     }
 
     function testExtractData() public {
