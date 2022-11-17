@@ -3,25 +3,27 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
 import "../src/SubgraphBridge.sol";
+import "../src/dependencies/TheGraph/IDisputeManager.sol";
 
 contract SubgraphBridgeTest is Test {
     // @notice Contracts
     SubgraphBridgeManager public bridge;
     SubgraphBridgeManager.SubgraphBridge public sampleBridge;
     // @notice SubgraphBridge Config
-    bytes32 public queryHash;
-    // string public oldQuery = "{tokens(first:1,block:{hash:\"0xc63eaefe604acb284fc4eee85e6dca8676f8c2c354503965c55b2b394713a594\"}){decimals}}";
-    string public query = '{"query":"{\n  blocks(first: 10, block: {hash: \"0x0x39b93cc969f3ac620b896a128ee322dbba2e745fb2d6b8ba7218a275b9296648\"}) {\n    id\n    number\n  }\n}","variables":{}}';
-    // actual query
-    //{\n  blocks(first: 10, block: {hash: \"0xe935226d85b26ee3891c86011216d1f14baef16e40e864b5cb4588ba67259e35\"}) {\n    id\n    number\n  }\n}\n
+    bytes public firstChunk = hex'7b227175657279223a227b5c6e2020626f6e6465724164646564732866697273743a2031302c20626c6f636b3a207b686173683a205c22';
+    bytes public lastChunk = hex'5c227d29207b5c6e2020202069645c6e20207d5c6e7d5c6e222c227661726961626c6573223a7b7d7d';
+    bytes32 public blockHash1 = 0xeee517bc8c2cdaf7b1a122161223fd9d29d25f9250b071c964d508c5a9cb0ee3;
+    bytes32 public subgraphDeploymentId = 0xe38339f1ed253e87deacd7d21ada20bb414fa9958d3ddd80f1e39aa724f76224;
 
-    // string public queryTemplate = '{"query":"{\n unstakes(first: 10, block: {hash: \"\"}) {\n id\n }\n}\n","variables":{}}';
-    string public queryTemplate = '{"query":"{\n  blocks(first: 10, block: {hash: \"\"}) {\n    id\n    number\n  }\n}","variables":{}}';
+    bytes32 public requestCID1 = 0x200d785a4e650a6d55daec459392da7c1e22a3304710221a0b807e2260626aca;
+    bytes32 public responseCID1 = 0x2ba2ff1138e3b6b95ca8ddc5fdeb67604ba15e35571f4e0adaa7b3a6e7d80284;
+
+    // @notice Attestation Data
+    bytes32 public r = 0xc67476e32e2121de62e78558392246c6b48e7ce505a051b40694ebf6a929bbb7;
+    bytes32 public s = 0x2c3c887a657777cdf5f907fc48fc92f229a60ce9bad7b27f1ed4819dbaa7c38f;
+    uint8 public v = 28;
+
     uint16 public responseDataOffset = 69; // TODO UPDATE THIS
-    uint16 public blockHashOffset = 47; // used to be 30
-    // uint16 public blockHashOffset = 10;
-    bytes32 public subgraphDeploymentId =
-        keccak256(abi.encodePacked("subgraph"));
     SubgraphBridgeManagerHelpers.BridgeDataType public bridgeDataType =
         SubgraphBridgeManagerHelpers.BridgeDataType.UINT;
 
@@ -33,20 +35,20 @@ contract SubgraphBridgeTest is Test {
     uint8 resolutionThresholdExternalStake = 0;
     address stakingToken = address(0);
 
-    bytes32 public defaultBlockHash = 0x39b93cc969f3ac620b896a128ee322dbba2e745fb2d6b8ba7218a275b9296648;
-    bytes32 public defaultRequestCID = 0x088e483c247ca4554b207bffe11fa57082e1d4ace993301ecfafe7b269114e28;
     uint256 public defaultBlockNumber;
     bytes32 public bridgeId;
 
     function setUp() public {
         address staking = 0xF55041E37E12cD407ad00CE2910B8269B01263b9;
+
         address dispute = 0x97307b963662cCA2f7eD50e38dCC555dfFc4FB0b;
+
         bridge = new SubgraphBridgeManager(staking, dispute);
-        queryHash = bridge.hashQueryTemplate(queryTemplate);
+
         sampleBridge = SubgraphBridgeManagerHelpers.SubgraphBridge(
-            queryTemplate,
+            firstChunk,
+            lastChunk,
             responseDataOffset,
-            blockHashOffset,
             bridgeDataType,
             subgraphDeploymentId,
             proposalFreezePeriod,
@@ -57,9 +59,13 @@ contract SubgraphBridgeTest is Test {
             resolutionThresholdExternalStake,
             stakingToken
         );
+
         bridge.createSubgraphBridge(sampleBridge);
+
         bridgeId = bridge._subgraphBridgeID(sampleBridge);
+
         emit log_bytes32(bridgeId);
+
         defaultBlockNumber = block.number;
     }
 
@@ -79,117 +85,26 @@ contract SubgraphBridgeTest is Test {
     }
 
     function testCreateRequestCID() public {
-        bytes32 requestCID = 0x088e483c247ca4554b207bffe11fa57082e1d4ace993301ecfafe7b269114e28;
-        bytes32 generatedRequestCID = bridge._generateQueryRequestCID(defaultBlockHash, bridgeId);
-        assertEq(requestCID, generatedRequestCID);
+        bytes32 generatedRequestCID = bridge._generateQueryRequestCID(blockHash1, bridgeId);
+        assertEq(requestCID1, generatedRequestCID);
     }
-
-    function strlen(string memory s) internal pure returns (uint256) {
-        uint256 len;
-        uint256 i = 0;
-        uint256 bytelength = bytes(s).length;
-        for (len = 0; i < bytelength; len++) {
-            bytes1 b = bytes(s)[i];
-            if (b < 0x80) {
-                i += 1;
-            } else if (b < 0xE0) {
-                i += 2;
-            } else if (b < 0xF0) {
-                i += 3;
-            } else if (b < 0xF8) {
-                i += 4;
-            } else if (b < 0xFC) {
-                i += 5;
-            } else {
-                i += 6;
-            }
-        }
-        return len;
-    }
-
-    function substring(
-        string memory str,
-        uint256 startIndex,
-        uint256 endIndex
-    ) public pure returns (string memory res) {
-        bytes memory strBytes = bytes(str);
-        bytes memory result = new bytes(endIndex - startIndex);
-        for (uint256 i = startIndex; i < endIndex; i++) {
-            result[i - startIndex] = strBytes[i];
-        }
-        res = string(result);
-    }
-
-    function bytes32ToString(bytes32 _bytes32) public pure returns (string memory) {
-        uint8 i = 0;
-        while(i < 32 && _bytes32[i] != 0) {
-            i++;
-        }
-        bytes memory bytesArray = new bytes(i);
-        for (i = 0; i < 32 && _bytes32[i] != 0; i++) {
-            bytesArray[i] = _bytes32[i];
-        }
-        return string(bytesArray);
-    }
-
-
-    function createQuery(string memory _queryTemplate, bytes32 _bridgeId) public returns(string memory) {
-        // (,,uint firstLen,,,,,,,,,) = bridge.subgraphBridges(_bridgeId);
-        // string memory firstChunk = substring(_queryTemplate, 0, firstLen);
-        // emit log_string(firstChunk);
-        // uint256 queryTemplateLen = strlen(_queryTemplate);
-        //
-        // // string memory blockHashString = bytes32ToString(defaultBlockHash);
-        // bytes memory blockHashString = hex"39b93cc969f3ac620b896a128ee322dbba2e745fb2d6b8ba7218a275b9296648";
-        // // emit log_string(blockHashString);
-        //
-        // string memory secondChunk = substring(
-        //     queryTemplate,
-        //     blockHashOffset,
-        //     queryTemplateLen
-        // );
-        // emit log_string(secondChunk);
-        //
-        // return string.concat(
-        //     firstChunk,
-        //     blockHashString,
-        //     secondChunk
-        // );
-    }
-
-    function createCID(string memory _queryTemplate, bytes32 _bridgeId) public view returns(bytes32) {
-        (,,uint firstLen,,,,,,,,,) = bridge.subgraphBridges(_bridgeId);
-        bytes memory firstChunk = bytes(substring(_queryTemplate, 0, firstLen));
-        // emit log_string(firstChunk);
-        uint256 queryTemplateLen = strlen(_queryTemplate);
-
-        bytes memory blockHashString = bytes(bytes32ToString(defaultBlockHash));
-        // emit log_string(blockHashString);
-
-        bytes memory secondChunk = bytes(substring(
-            queryTemplate,
-            blockHashOffset,
-            queryTemplateLen
-        ));
-        // emit log_string(secondChunk);
-        bytes memory joined = bytes.concat(firstChunk, blockHashString, secondChunk);
-        return keccak256(joined);
-    }
-
-    function testCreateQuery() public {
-      emit log_string(createQuery(queryTemplate, bridgeId));
-    }
-
-    function testCreateCID() public {
-        emit log_bytes32(createCID(queryTemplate, bridgeId));
-      } 
 
     function testQueryAndResponseMatchAttestation() public {
-      // do something
+      string memory response = '{"data":{"bonderAddeds":[{"id":"0x044e86abf512ff8914f03da2d6ac41725b0ad09e56cef7326bb5ca4a173f35db60"},{"id":"0x0a9209bfa2cfe74d7b81901c422766d65b43c2452ebe3c99319d14cad5a78301127"},{"id":"0x0f3f94aad9213eccee4540428c1cc0a315ce92b25af8dfe9d48b49dbb33a09a1111"},{"id":"0x2ca87cf0eb5259ca22cd015e6d5f25b92800a98d665d3ad009920da2c38020c2107"},{"id":"0x3aef54912826dfad2198871f1cd1083cc59cd5987f36019dc3cfb0c9d01faf2716"},{"id":"0x3eb7e67c64e6f1b2b130ff3b718f7b80634b090fb830d1463c76b5be7325044e88"},{"id":"0x3eb7e67c64e6f1b2b130ff3b718f7b80634b090fb830d1463c76b5be7325044e89"},{"id":"0x5e39acf2fbfaf76f862da9d5cb631984d79b1f9c5ed53d4935990cce32e8b618136"},{"id":"0x6cb5869dac39393c4717439eb4a49e5f0ea12fb466f2d18a1bfa10de307cf83942"},{"id":"0x889eee552461cff761f2954834adbc1e6714c6ec7bb74e6d4c84049fc7a6d9fc15"}]}}';
+      IDisputeManager.Attestation memory attestation = IDisputeManager.Attestation(requestCID1, responseCID1, subgraphDeploymentId, r, s, v);
+
+      assertEq(bridge._queryAndResponseMatchAttestation(blockHash1, bridgeId, response, attestation), true);
     }
 
     function testParseAttestation() public {
         // do something
+        bytes memory attestationBytes = abi.encodePacked('{"requestCID":"0x200d785a4e650a6d55daec459392da7c1e22a3304710221a0b807e2260626aca","responseCID":"0x2ba2ff1138e3b6b95ca8ddc5fdeb67604ba15e35571f4e0adaa7b3a6e7d80284","subgraphDeploymentID":"0xe38339f1ed253e87deacd7d21ada20bb414fa9958d3ddd80f1e39aa724f76224","v":28,"r":"0xc67476e32e2121de62e78558392246c6b48e7ce505a051b40694ebf6a929bbb7","s":"0x2c3c887a657777cdf5f907fc48fc92f229a60ce9bad7b27f1ed4819dbaa7c38f"}');
+      IDisputeManager.Attestation memory attestation = IDisputeManager.Attestation(requestCID1, responseCID1, subgraphDeploymentId, r, s, v);
+
+      bytes32 attestationHash = keccak256(abi.encode(attestation));
+      bytes32 parsedAttestationHash = keccak256(abi.encode(bridge._parseAttestation(attestationBytes)));
+
+      assertEq(attestationHash, parsedAttestationHash);
     }
 
     function testExtractData() public {

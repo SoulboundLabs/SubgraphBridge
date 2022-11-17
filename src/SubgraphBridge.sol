@@ -29,6 +29,8 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
     // {SubgraphBridgeID} -> {requestCID} -> {responseData}
     mapping(bytes32 => mapping(bytes32 => uint256)) public subgraphBridgeData;
 
+    event SubgraphBridgeCreation(address bridgeCreator, bytes32 subgraphBridgeId, bytes32 subgraphDeploymentID);
+
     constructor(address staking, address disputeManager) {
         theGraphStaking = staking;
         theGraphDisputeManager = disputeManager;
@@ -43,6 +45,7 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
     function createSubgraphBridge(SubgraphBridge memory subgraphBridge) public {
         bytes32 subgraphBridgeID = _subgraphBridgeID(subgraphBridge); // set the subgraphId to the hashed SubgraphBridge
         subgraphBridges[subgraphBridgeID] = subgraphBridge;
+        emit SubgraphBridgeCreation(msg.sender, subgraphBridgeID, subgraphBridge.subgraphDeploymentID);
     }
 
     // @notice, this function is used to provide an attestation for a query
@@ -52,10 +55,12 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
     // @param response, the response of the query
     // @param subgraphBridgeID, the ID of the subgraph bridge
     // @param calldata attestation, the attestation of the response
+
+    // TODO: WE MIGHT WANT TO CHANGE THIS TO BE BY BLOCKHASH DIRECTLY?
+    // OR MAYBE ADD IN THE OLD OVERWRITE FUNCTION TO PIN A BLOCK NUMBER -> HASH?
     function postSubgraphResponse(
         uint256 blockNumber,
         bytes32 subgraphBridgeID,
-        string calldata query,
         string calldata response,
         bytes calldata attestationData
     ) public {
@@ -65,7 +70,7 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
             pinnedBlocks[pinnedBlockHash] = blockNumber;
         }
         require(
-            subgraphBridges[subgraphBridgeID].blockHashOffset > 0,
+            subgraphBridges[subgraphBridgeID].responseDataOffset != 0,
             "query bridge doesn't exist"
         );
 
@@ -102,13 +107,7 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         ) {
             proposals.proposalCount = proposals.proposalCount + 1;
 
-            uint16 blockHashOffset = subgraphBridges[subgraphBridgeID]
-                .blockHashOffset;
-            bytes32 queryBlockHash = _bytes32FromString(
-                query,
-                blockHashOffset + 2
-            ); // todo: why +2?
-            require(pinnedBlocks[queryBlockHash] > 0, "block hash unpinned");
+            require(pinnedBlocks[pinnedBlockHash] > 0, "block hash unpinned");
         }
 
         // update stake values
@@ -187,12 +186,12 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         pinnedBlocks[blockhash(blockNumber)] = blockNumber;
     }
 
+    //TODO: HANDLE ALL DATA TYPES
     function _extractData(
         bytes32 subgraphBridgeID,
         bytes32 requestCID,
         string calldata response
     ) private {
-        //NOTE: THIS FUNCTION ISN'T DONE. NEED TO HANDLE ALL DATA TYPES
         BridgeDataType _type = subgraphBridges[subgraphBridgeID]
             .responseDataType;
 
@@ -229,12 +228,13 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
      *@param attestation, the attestation from the indexer
      *@return bool, returns true if everything matches, fails otherwise
      */
+     // TODO: UPDATE THIS BACK TO INTERNAL
     function _queryAndResponseMatchAttestation(
         bytes32 blockHash,
         bytes32 subgraphBridgeID,
         string calldata response,
         IDisputeManager.Attestation memory attestation
-    ) internal view returns (bool) {
+    ) public view returns (bool) {
         require(
             attestation.requestCID ==
                 _generateQueryRequestCID(blockHash, subgraphBridgeID),
@@ -256,8 +256,9 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
      * @dev Parse the bytes attestation into a struct from `_data`.
      * @return Attestation struct
      */
+     // TODO: UPDATE THIS BACK TO INTERNAL
     function _parseAttestation(bytes memory _data)
-        internal
+        public
         pure
         returns (IDisputeManager.Attestation memory)
     {
@@ -292,7 +293,7 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
     }
 
     /**
-     *@dev this function generates (WHAT SHOULD BE) the requestCID for the query at a blocknumber
+     *@dev this function generates the requestCID for the query at a blocknumber
      *@param _blockhash, the blockchash we are querying
      *@param _subgraphBridgeId, the id of the subgraphBridge
      *@return the keccak256 hash of the request
@@ -303,17 +304,9 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
     ) public view returns (bytes32) {
         SubgraphBridge storage bridge = subgraphBridges[_subgraphBridgeId];
 
-        uint256 firstLen = bridge.blockHashOffset; // length from start-> block
-        string memory firstChunk = substring(bridge.queryTemplate, 0, firstLen);
-        uint256 queryTemplateLen = strlen(bridge.queryTemplate);
-        string memory secondChunk = substring(
-            bridge.queryTemplate,
-            bridge.blockHashOffset,
-            queryTemplateLen
-        );
-        return
-            keccak256(
-                bytes(abi.encodePacked(firstChunk, _blockhash, secondChunk))
-            );
+        bytes memory firstChunk = bridge.queryFirstChunk;
+        bytes memory blockHash = toHexBytes(_blockhash);
+        bytes memory lastChunk = bridge.queryLastChunk;
+        return keccak256(bytes.concat(firstChunk, blockHash, lastChunk));
     }
 }

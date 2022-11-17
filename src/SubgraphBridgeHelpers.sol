@@ -45,6 +45,7 @@ contract SubgraphBridgeManagerHelpers {
         uint256 tokenStake; // GRT staked by oracles through Subgraph Bridge contract
     }
 
+    // TODO: Create a function to decode this data.
     enum BridgeDataType {
         ADDRESS,
         BYTES32,
@@ -52,13 +53,15 @@ contract SubgraphBridgeManagerHelpers {
         // todo: string
     }
 
+    // TODO: Maybe combine first and last chunk of the query into a single bytes value, and store the split location somewhere else.
     struct SubgraphBridge {
-        string queryTemplate; // query to the subgraph with the blockhash stripped
+        bytes queryFirstChunk; // the first bit of the query up to where the blockhash starts
+        bytes queryLastChunk; // the last bit of the query from where the blockhash ends to the end of query
         uint16 responseDataOffset; // index where the data starts in the response string
-        uint16 blockHashOffset; // where the pinned block hash starts in the query string
+        // NOTE: Not needed anymore now that we have the first and last chunk pattern.
+        // uint16 blockHashOffset; // where the pinned block hash starts in the query string
         BridgeDataType responseDataType; // data type to be extracted from graphQL response string
         bytes32 subgraphDeploymentID; // subgraph being queried
-        // uint16[2] queryVariables; // type stored in first byte, location in last
 
         // dispute handling config
         uint8 proposalFreezePeriod; // undisputed queries can only be executed after this many blocks
@@ -70,6 +73,7 @@ contract SubgraphBridgeManagerHelpers {
         address stakingToken; // erc20 token for external staking
     }
 
+    //TODO: Update this to hash something important now that query template is different
     function hashQueryTemplate(string memory queryTemplate)
         public
         pure
@@ -207,39 +211,25 @@ contract SubgraphBridgeManagerHelpers {
         return tempBytes32;
     }
 
-    function strlen(string memory s) internal pure returns (uint256) {
-        uint256 len;
-        uint256 i = 0;
-        uint256 bytelength = bytes(s).length;
-        for (len = 0; i < bytelength; len++) {
-            bytes1 b = bytes(s)[i];
-            if (b < 0x80) {
-                i += 1;
-            } else if (b < 0xE0) {
-                i += 2;
-            } else if (b < 0xF0) {
-                i += 3;
-            } else if (b < 0xF8) {
-                i += 4;
-            } else if (b < 0xFC) {
-                i += 5;
-            } else {
-                i += 6;
-            }
-        }
-        return len;
+    function toHex16 (bytes16 data) internal pure returns (bytes32 result) {
+    result = bytes32 (data) & 0xFFFFFFFFFFFFFFFF000000000000000000000000000000000000000000000000 |
+          (bytes32 (data) & 0x0000000000000000FFFFFFFFFFFFFFFF00000000000000000000000000000000) >> 64;
+    result = result & 0xFFFFFFFF000000000000000000000000FFFFFFFF000000000000000000000000 |
+          (result & 0x00000000FFFFFFFF000000000000000000000000FFFFFFFF0000000000000000) >> 32;
+    result = result & 0xFFFF000000000000FFFF000000000000FFFF000000000000FFFF000000000000 |
+          (result & 0x0000FFFF000000000000FFFF000000000000FFFF000000000000FFFF00000000) >> 16;
+    result = result & 0xFF000000FF000000FF000000FF000000FF000000FF000000FF000000FF000000 |
+          (result & 0x00FF000000FF000000FF000000FF000000FF000000FF000000FF000000FF0000) >> 8;
+    result = (result & 0xF000F000F000F000F000F000F000F000F000F000F000F000F000F000F000F000) >> 4 |
+          (result & 0x0F000F000F000F000F000F000F000F000F000F000F000F000F000F000F000F00) >> 8;
+    result = bytes32 (0x3030303030303030303030303030303030303030303030303030303030303030 +
+           uint256 (result) +
+           (uint256 (result) + 0x0606060606060606060606060606060606060606060606060606060606060606 >> 4 &
+           // 0x0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F) * 7);
+           0x0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F) * 39);
     }
 
-    function substring(
-        string memory str,
-        uint256 startIndex,
-        uint256 endIndex
-    ) public pure returns (string memory res) {
-        bytes memory strBytes = bytes(str);
-        bytes memory result = new bytes(endIndex - startIndex);
-        for (uint256 i = startIndex; i < endIndex; i++) {
-            result[i - startIndex] = strBytes[i];
-        }
-        res = string(result);
+    function toHexBytes (bytes32 data) public pure returns (bytes memory) {
+        return abi.encodePacked ("0x", toHex16 (bytes16 (data)), toHex16 (bytes16 (data << 128)));
     }
 }
