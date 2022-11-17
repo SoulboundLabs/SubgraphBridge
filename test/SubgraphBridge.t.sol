@@ -26,9 +26,9 @@ contract SubgraphBridgeTest is Test {
 
     string public response1 = '{"data":{"bonderAddeds":[{"id":"0x044e86abf512ff8914f03da2d6ac41725b0ad09e56cef7326bb5ca4a173f35db60"},{"id":"0x0a9209bfa2cfe74d7b81901c422766d65b43c2452ebe3c99319d14cad5a78301127"},{"id":"0x0f3f94aad9213eccee4540428c1cc0a315ce92b25af8dfe9d48b49dbb33a09a1111"},{"id":"0x2ca87cf0eb5259ca22cd015e6d5f25b92800a98d665d3ad009920da2c38020c2107"},{"id":"0x3aef54912826dfad2198871f1cd1083cc59cd5987f36019dc3cfb0c9d01faf2716"},{"id":"0x3eb7e67c64e6f1b2b130ff3b718f7b80634b090fb830d1463c76b5be7325044e88"},{"id":"0x3eb7e67c64e6f1b2b130ff3b718f7b80634b090fb830d1463c76b5be7325044e89"},{"id":"0x5e39acf2fbfaf76f862da9d5cb631984d79b1f9c5ed53d4935990cce32e8b618136"},{"id":"0x6cb5869dac39393c4717439eb4a49e5f0ea12fb466f2d18a1bfa10de307cf83942"},{"id":"0x889eee552461cff761f2954834adbc1e6714c6ec7bb74e6d4c84049fc7a6d9fc15"}]}}';
 
-    uint16 public responseDataOffset = 69; // TODO UPDATE THIS
+    uint16 public responseDataOffset = 32; // TODO UPDATE THIS
     SubgraphBridgeManagerHelpers.BridgeDataType public bridgeDataType =
-        SubgraphBridgeManagerHelpers.BridgeDataType.UINT;
+        SubgraphBridgeManagerHelpers.BridgeDataType.BYTES32;
 
     uint8 proposalFreezePeriod = 69;
     uint8 minimumSlashableGRT = 100;
@@ -117,30 +117,40 @@ contract SubgraphBridgeTest is Test {
       assertEq(attestationHash, rawAttestationHash);
     }
 
-
-    function testPostSubgraphResponse() public {
+    function postSubgraphResponse() public {
       bytes memory attestationBytes = abi.encodePacked(requestCID1, responseCID1, subgraphDeploymentId, r,s,v);
 
-      emit log_bytes32(blockhash(blockNumber1));
-
-      bridge.pinBlockHash(blockNumber1);
+      //TODO: Maybe get rid of the pin blockNumber nonsense
+      // bridge.pinBlockHash(blockNumber1);
 
       vm.prank(vitalik);
-      // without pinning blockhash first
+
       bridge.postSubgraphResponse(
-        // blockNumber1,
         blockHash1,
         bridgeId,
         response1,
         attestationBytes);
     }
 
-    function testCertifySubgraphResponse() public {
-        // do something
+
+    function testPostSubgraphResponse() public {
+      postSubgraphResponse();
     }
 
-    function testExtractData() public {
+    function testCertifySubgraphResponse() public {
+      bytes memory attestationBytes = abi.encodePacked(requestCID1, responseCID1, subgraphDeploymentId, r,s,v);
+
+      postSubgraphResponse();
+      vm.warp(7 days);
+      vm.prank(vitalik);
         // do something
+      bridge.certifySubgraphResponse(
+        blockHash1,
+        response1,
+        bridgeId,
+        attestationBytes);
+
+      assert(bridge.subgraphBridgeData(bridgeId, requestCID1) != 0);
     }
 
 }

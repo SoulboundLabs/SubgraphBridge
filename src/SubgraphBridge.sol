@@ -64,7 +64,8 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         string calldata response,
         bytes calldata attestationData
     ) public {
-        require(pinnedBlocks[blockHash] != 0, "Blockhash isn't pinned");
+        // TODO: Idk if I want to keep this pinned block thing in or not
+        // require(pinnedBlocks[blockHash] != 0, "Blockhash isn't pinned");
         require(
             subgraphBridges[subgraphBridgeID].responseDataOffset != 0,
             "query bridge doesn't exist"
@@ -103,7 +104,7 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         ) {
             proposals.proposalCount = proposals.proposalCount + 1;
 
-            require(pinnedBlocks[blockHash] > 0, "block hash unpinned");
+            // require(pinnedBlocks[blockHash] > 0, "block hash unpinned");
         }
 
         // update stake values
@@ -127,14 +128,15 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
 
     //@dev for a subgraphBridge, we are certifying data at a specific block hash
     function certifySubgraphResponse(
-        uint256 blockNumber,
+        // uint256 blockNumber,
+        bytes32 _blockhash,
         string calldata response,
         bytes32 subgraphBridgeId,
         bytes calldata attestationData // contains cid of response and request
     ) public {
         // uint16 blockHashOffset = subgraphBridges[subgraphBridgeId]
         // .blockHashOffset + 2;
-        bytes32 _blockhash = blockhash(blockNumber);
+        // bytes32 _blockhash = blockhash(blockNumber);
         IDisputeManager.Attestation memory attestation = _parseAttestation(
             attestationData
         );
@@ -210,7 +212,6 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
             */
         } else if (_type == BridgeDataType.BYTES32) {
             //DO ANOTHER THING
-            //NOTE: I'M NOT SURE IF THIS IS RIGHT OR NOT??
             subgraphBridgeData[subgraphBridgeID][requestCID] = uint256(
                 _bytes32FromString(
                     response,
