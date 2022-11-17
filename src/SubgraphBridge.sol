@@ -59,16 +59,12 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
     // TODO: WE MIGHT WANT TO CHANGE THIS TO BE BY BLOCKHASH DIRECTLY?
     // OR MAYBE ADD IN THE OLD OVERWRITE FUNCTION TO PIN A BLOCK NUMBER -> HASH?
     function postSubgraphResponse(
-        uint256 blockNumber,
+        bytes32 blockHash,
         bytes32 subgraphBridgeID,
         string calldata response,
         bytes calldata attestationData
     ) public {
-        bytes32 pinnedBlockHash = blockhash(blockNumber);
-        // If the block number -> blockhash isn't pinned, pin it
-        if (pinnedBlocks[pinnedBlockHash] == 0) {
-            pinnedBlocks[pinnedBlockHash] = blockNumber;
-        }
+        require(pinnedBlocks[blockHash] != 0, "Blockhash isn't pinned");
         require(
             subgraphBridges[subgraphBridgeID].responseDataOffset != 0,
             "query bridge doesn't exist"
@@ -79,7 +75,7 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         );
         require(
             _queryAndResponseMatchAttestation(
-                blockhash(blockNumber),
+                blockHash,
                 subgraphBridgeID,
                 response,
                 attestation
@@ -107,7 +103,7 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         ) {
             proposals.proposalCount = proposals.proposalCount + 1;
 
-            require(pinnedBlocks[pinnedBlockHash] > 0, "block hash unpinned");
+            require(pinnedBlocks[blockHash] > 0, "block hash unpinned");
         }
 
         // update stake values
@@ -178,6 +174,10 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
     // ============================================================
     // INTERNAL AND HELPER FUNCTIONS
     // ============================================================
+
+    // TODO: MAYBE MAKE THIS AN ADMIN FUNCTION?
+    // NOT SURE HOW WE WANT TO HANDLE PEOPLE JUST PINNING RANDOM BLOCKS
+    // since blockhash only returns values for the most recent 256 blocks
     function pinBlockHash(uint256 blockNumber) public {
         require(
             pinnedBlocks[blockhash(blockNumber)] == 0,
