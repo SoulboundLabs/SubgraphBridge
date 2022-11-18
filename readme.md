@@ -1,4 +1,4 @@
-# Subgraph Bridge 📊🌉
+# SoulboundLabs Subgraph Bridge 📊🌉
 
 A smart contract enabling for optimistic subgraph query results to be used on chain with configurable security params and query values. This allows for some interesting things, such as the graph as an L2, as well as this technically enables composable subgraphs. As you can bridge a subgraph result on chain, and create another subgraph that tracks this contract, allowing a subgraph to use the data from another subgraph.
 
@@ -18,6 +18,14 @@ A smart contract enabling for optimistic subgraph query results to be used on ch
 
 # Tests 🧪
 
+Requirements: Foundry [Link to foundry, it's really great](https://book.getfoundry.sh/)
+
 The tests are run with queries to the HOP mainnet subgraph. [Link to subgraph](https://thegraph.com/explorer/subgraphs/Cjv3tykF4wnd6m9TRmQV7weiLjizDnhyt6x2tTJB42Cy?view=Playground)
 
-command for testing: `forge test --fork-url https://eth-mainnet.g.alchemy.com/v2/<YOUR API KEY>
+Because of the $GRT balance checks we use for the subgraph attestations, it is easiest to just fork mainnet. You technically don't need to fork from a block number, but just in case an indexer stops indexing the subgraph, you should just run the command below to test.
+
+command for testing: `forge test --fork-url https://eth-mainnet.g.alchemy.com/v2/<YOUR API KEY> --fork-block-number 15984600`
+
+---
+
+An open source public good made with ❤️ 
