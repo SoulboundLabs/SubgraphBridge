@@ -196,7 +196,7 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
     }
 
     //TODO: HANDLE ALL DATA TYPES
-    function _extractData(
+    function _extractData (
         bytes32 subgraphBridgeID,
         bytes32 requestCID,
         string calldata response

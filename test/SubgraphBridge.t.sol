@@ -137,7 +137,7 @@ contract SubgraphBridgeTest is Test {
       postSubgraphResponse();
     }
 
-    function testCertifySubgraphResponse() public {
+    function certifySubgraphResponse() public {
       bytes memory attestationBytes = abi.encodePacked(requestCID1, responseCID1, subgraphDeploymentId, r,s,v);
 
       postSubgraphResponse();
@@ -152,6 +152,10 @@ contract SubgraphBridgeTest is Test {
 
       // TODO: Create some new queries with other data types.
       assert(bridge.subgraphBridgeData(bridgeId, requestCID1) != 0);
+    }
+
+    function testCertifySubgraphResponse() public {
+      certifySubgraphResponse();
     }
 
 }
