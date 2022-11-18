@@ -1,6 +1,8 @@
 # SoulboundLabs Subgraph Bridge 📊🌉
 
-A smart contract enabling for optimistic subgraph query results to be used on chain with configurable security params and query values. This allows for some interesting things, such as the graph as an L2, as well as this technically enables composable subgraphs. As you can bridge a subgraph result on chain, and create another subgraph that tracks this contract, allowing a subgraph to use the data from another subgraph.
+### THIS CONTRACT IS NOT FINAL. I AM STILL MAKING SOME FINISHING DESIGN DECISIONS AND CLEANING THE CODE A BIT MORE.
+
+A smart contract enabling for optimistic subgraph query results to be used on chain with configurable security params and query values. This allows for some interesting things, such as the graph as an L2 for offloading computation (this get's fun when substreams become a thing), as well as this technically enables composable subgraphs. As you can bridge a subgraph result on chain, and create another subgraph that tracks this contract, allowing a subgraph to use the data from another subgraph. Snazzy!
 
 ---
 
