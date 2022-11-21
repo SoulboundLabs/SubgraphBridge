@@ -22,11 +22,11 @@ interface ISubgraphBridge {
         // dispute handling config
         uint8 proposalFreezePeriod; // undisputed queries can only be executed after this many blocks
         uint8 minimumSlashableGRT; // minimum slashable GRT staked by indexers in order for undisputed proposal to pass
-        uint8 minimumExternalStake; // minimum external tokens staked in order for undisputed proposal to pass
         uint8 disputeResolutionWindow; // how many blocks it takes for disputes to be settled (0 indicates no dispute resolution)
         uint8 resolutionThresholdSlashableGRT; // (30-99) percent of slashable GRT required for dispute resolution
         uint8 resolutionThresholdExternalStake; // (30-99) percentage of external stake required for dispute resolution
-        address stakingToken; // erc20 token for external staking
+        // uint8 minimumExternalStake; // minimum external tokens staked in order for undisputed proposal to pass
+        // address stakingToken; // erc20 token for external staking
   }
 
   function createSubgraphBridge(SubgraphBridge memory subgraphBridge) external;

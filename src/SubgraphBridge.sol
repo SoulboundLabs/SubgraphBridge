@@ -246,7 +246,7 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         require(
             attestation.requestCID ==
                 _generateQueryRequestCID(blockHash, subgraphBridgeID),
-            "_queryAndResponseMatchAttestation: RequestCID Doesn't match"
+            "_queryAndResponseMatchAttestation: RequestCID Doesn't Match"
         );
         require(
             attestation.responseCID == keccak256(abi.encodePacked(response)),
