@@ -166,7 +166,6 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         ][requestCID];
         require(proposals.proposalCount == 1, "proposalCount must be 1");
 
-        // TODO: CHECK THIS IS WORKIN RIGHT
         bytes32 responseCID = keccak256(abi.encodePacked(response));
 
         require(

@@ -107,7 +107,7 @@ contract SubgraphBridgeTest is Test {
         vm.expectRevert(bytes("pinBlockHash: already pinned!"));
         bridge.pinBlockHash(defaultBlockNumber);
         bytes32 blockHash = blockhash(defaultBlockNumber);
-        emit log_uint(bridge.pinnedBlocks(blockHash));
+        // emit log_uint(bridge.pinnedBlocks(blockHash));
     }
 
     function testCreateRequestCID() public {
