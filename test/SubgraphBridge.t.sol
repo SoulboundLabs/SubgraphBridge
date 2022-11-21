@@ -35,6 +35,15 @@ contract SubgraphBridgeTest is Test {
     string public response1 =
         '{"data":{"bonderAddeds":[{"id":"0x044e86abf512ff8914f03da2d6ac41725b0ad09e56cef7326bb5ca4a173f35db60"},{"id":"0x0a9209bfa2cfe74d7b81901c422766d65b43c2452ebe3c99319d14cad5a78301127"},{"id":"0x0f3f94aad9213eccee4540428c1cc0a315ce92b25af8dfe9d48b49dbb33a09a1111"},{"id":"0x2ca87cf0eb5259ca22cd015e6d5f25b92800a98d665d3ad009920da2c38020c2107"},{"id":"0x3aef54912826dfad2198871f1cd1083cc59cd5987f36019dc3cfb0c9d01faf2716"},{"id":"0x3eb7e67c64e6f1b2b130ff3b718f7b80634b090fb830d1463c76b5be7325044e88"},{"id":"0x3eb7e67c64e6f1b2b130ff3b718f7b80634b090fb830d1463c76b5be7325044e89"},{"id":"0x5e39acf2fbfaf76f862da9d5cb631984d79b1f9c5ed53d4935990cce32e8b618136"},{"id":"0x6cb5869dac39393c4717439eb4a49e5f0ea12fb466f2d18a1bfa10de307cf83942"},{"id":"0x889eee552461cff761f2954834adbc1e6714c6ec7bb74e6d4c84049fc7a6d9fc15"}]}}';
 
+    bytes attestationBytes = abi.encodePacked(
+        requestCID1,
+        responseCID1,
+        subgraphDeploymentId,
+        r,
+        s,
+        v
+    );
+
 
 // hey there copilot 
     uint16 public responseDataOffset = 32; // TODO UPDATE THIS
@@ -44,7 +53,7 @@ contract SubgraphBridgeTest is Test {
     uint8 proposalFreezePeriod = 69;
     uint8 minimumSlashableGRT = 100;
     uint8 minimumExternalStake = 0;
-    uint8 disputeResolutionWindow = 0;
+    uint8 disputeResolutionWindow = 100; // 100 blocks or 25 minutes
     uint8 resolutionThresholdSlashableGRT = 50;
     uint8 resolutionThresholdExternalStake = 0;
     address stakingToken = address(0);
@@ -132,14 +141,6 @@ contract SubgraphBridgeTest is Test {
     }
 
     function testParseAttestation() public {
-        bytes memory attestationBytes = abi.encodePacked(
-            requestCID1,
-            responseCID1,
-            subgraphDeploymentId,
-            r,
-            s,
-            v
-        );
         IDisputeManager.Attestation memory attestation = IDisputeManager
             .Attestation(
                 requestCID1,
@@ -168,15 +169,16 @@ contract SubgraphBridgeTest is Test {
     }
 
     function postSubgraphResponse() public {
-        bytes memory attestationBytes = abi.encodePacked(
-            requestCID1,
-            responseCID1,
-            subgraphDeploymentId,
-            r,
-            s,
-            v
+        // should work
+        bridge.postSubgraphResponse(
+            blockHash1,
+            bridgeId,
+            response1,
+            attestationBytes
         );
+    }
 
+    function testPostSubgraphResponse() public {
         // should revert if we try to use a non-existent query bridge id
         bytes32 badBridgeId = keccak256("hey");
         vm.expectRevert("query bridge doesn't exist");
@@ -197,7 +199,7 @@ contract SubgraphBridgeTest is Test {
             bytes.concat(attestationBytes, "testing")
         );
 
-        // if we submit a invalid requestCID it should revert 
+        // if we submit an invalid requestCID it should revert 
         bytes memory invalidRequest = abi.encodePacked(
             keccak256("invalidRequest"),
             responseCID1,
@@ -214,7 +216,7 @@ contract SubgraphBridgeTest is Test {
             invalidRequest
         );
 
-        // if we submit a invalid response it should revert 
+        // if we submit an invalid response it should revert
         bytes memory invalidResponse = abi.encodePacked(
             requestCID1,
             keccak256("invalidResponse"),
@@ -248,32 +250,30 @@ contract SubgraphBridgeTest is Test {
             invalidSubgraphDeploymentID
         );
 
-        // should work
-        vm.prank(vitalik);
+        vm.expectRevert("query bridge doesn't exist");
         bridge.postSubgraphResponse(
-            blockHash1,
-            bridgeId,
-            response1,
-            attestationBytes
+          blockHash1,
+          keccak256("invalidBridgeId"),
+          response1,
+          attestationBytes
         );
-    }
 
-    function testPostSubgraphResponse() public {
         postSubgraphResponse();
     }
 
     function certifySubgraphResponse() public {
-        bytes memory attestationBytes = abi.encodePacked(
-            requestCID1,
-            responseCID1,
-            subgraphDeploymentId,
-            r,
-            s,
-            v
+        vm.expectRevert("proposalCount must be 1");
+        bridge.certifySubgraphResponse(
+            blockHash1,
+            response1,
+            bridgeId,
+            attestationBytes
         );
-
         postSubgraphResponse();
-        vm.warp(7 days);
+
+        // TODO: REFACTOR HOW THE TIME CHECKS WORK FOR THE PROPOSAL STILL FROZEN REQUIRE STATEMENT
+        // vm.expectRevert()
+        vm.warp(25 minutes);
         vm.prank(vitalik);
         // do something
         bridge.certifySubgraphResponse(
