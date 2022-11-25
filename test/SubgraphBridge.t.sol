@@ -73,15 +73,15 @@ contract SubgraphBridgeTest is Test {
         sampleBridge = SubgraphBridgeManagerHelpers.SubgraphBridge(
             firstChunk,
             lastChunk,
-            responseDataOffset,
             bridgeDataType,
             subgraphDeploymentId,
             proposalFreezePeriod,
+            responseDataOffset,
             minimumSlashableGRT,
-            minimumExternalStake,
-            resolutionThresholdSlashableGRT,
-            resolutionThresholdExternalStake,
-            stakingToken
+            // minimumExternalStake,
+            resolutionThresholdSlashableGRT
+            // resolutionThresholdExternalStake
+            // stakingToken
         );
 
         bridge.createSubgraphBridge(sampleBridge);
