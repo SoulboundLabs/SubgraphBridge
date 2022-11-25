@@ -48,26 +48,34 @@ interface IDisputeManager {
 
     function setFishermanRewardPercentage(uint32 _percentage) external;
 
-    function setSlashingPercentage(uint32 _qryPercentage, uint32 _idxPercentage) external;
+    function setSlashingPercentage(uint32 _qryPercentage, uint32 _idxPercentage)
+        external;
 
     // -- Getters --
 
     function isDisputeCreated(bytes32 _disputeID) external view returns (bool);
 
-    function encodeHashReceipt(Receipt memory _receipt) external view returns (bytes32);
+    function encodeHashReceipt(Receipt memory _receipt)
+        external
+        view
+        returns (bytes32);
 
     function areConflictingAttestations(
         Attestation memory _attestation1,
         Attestation memory _attestation2
     ) external pure returns (bool);
 
-    function getAttestationIndexer(Attestation memory _attestation) external view returns (address);
+    function getAttestationIndexer(Attestation memory _attestation)
+        external
+        view
+        returns (address);
 
     // -- Dispute --
 
-    function createQueryDispute(bytes calldata _attestationData, uint256 _deposit)
-        external
-        returns (bytes32);
+    function createQueryDispute(
+        bytes calldata _attestationData,
+        uint256 _deposit
+    ) external returns (bytes32);
 
     function createQueryDisputeConflict(
         bytes calldata _attestationData1,
