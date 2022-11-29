@@ -124,20 +124,46 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
             // require(pinnedBlocks[blockHash] > 0, "block hash unpinned");
         }
 
+        // push this attestation and data to the response array
+        proposals.responseProposals.push(
+            ResponseProposal(attestation.responseCID, attestationData)
+        );
+
         // update stake values
         proposals
             .stake[attestation.responseCID]
             .accountStake[attestationIndexer]
             .attestationStake = indexerStake;
+
         proposals.stake[attestation.responseCID].totalStake.attestationStake =
             proposals
                 .stake[attestation.responseCID]
                 .totalStake
                 .attestationStake +
             indexerStake;
+
         proposals.totalStake.attestationStake =
             proposals.totalStake.attestationStake +
             indexerStake;
+
+        // loop over all of the responseProposals and check if the responseCID is equal for all of them, if not open a new conflict
+        for (uint256 i; i < proposals.responseProposals.length; i++) {
+            bytes32 _responseCID = proposals.responseProposals[i].responseCID;
+            bytes memory _attestationData = proposals
+                .responseProposals[i]
+                .attestationData;
+            if (attestation.responseCID != _responseCID) {
+                // create a query dispute
+                createQueryDispute(
+                    subgraphBridgeID, //subgraphBridgeID
+                    attestation.requestCID, // requestCID
+                    attestation.responseCID, //responseCID of this proposal
+                    _responseCID, //responseCID of the conflicting proposal
+                    i, // index of the conflicting proposal
+                    proposals.responseProposals.length - 1 // index of the submitted proposal
+                );
+            }
+        }
 
         emit SubgraphResponseAdded(
             msg.sender,
@@ -150,11 +176,10 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
 
     //@notice, this function allows you to use a non disputed query response after the dispute period has ended
     //@dummy, use this function to slurp up your query data
-    // TODO: Add in a check for the attestation not being disputed over in the dispute manager contract.
     function certifySubgraphResponse(
         bytes32 _blockhash,
-        string calldata response,
         bytes32 subgraphBridgeId,
+        string calldata response,
         bytes calldata attestationData // contains cid of response and request
     ) public {
         IDisputeManager.Attestation memory attestation = parseAttestation(
@@ -179,7 +204,12 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         SubgraphBridgeProposals storage proposals = subgraphBridgeProposals[
             subgraphBridgeId
         ][requestCID];
-        require(proposals.proposalCount == 1, "proposalCount must be 1");
+        //TODO: SANITY CHECK THIS AND SEE IF WE MEAN EQUAL TO GREATER THAN OR EQUAL TO
+        // require(proposals.proposalCount == 1, "proposalCount must be 1");
+        require(
+            proposals.proposalCount >= 1,
+            "proposalCount must be at least 1"
+        );
 
         bytes32 responseCID = keccak256(abi.encodePacked(response));
 
@@ -262,6 +292,7 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
                 return true;
             }
         }
+        return false;
     }
 
     // TODO: MAYBE MAKE THIS AN ADMIN FUNCTION?

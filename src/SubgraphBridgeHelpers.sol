@@ -60,20 +60,16 @@ contract SubgraphBridgeManagerHelpers {
     }
 
     struct SubgraphBridge {
+        // QUERY AND RESPONSE CONFIG
         bytes queryFirstChunk; // the first bit of the query up to where the blockhash starts
         bytes queryLastChunk; // the last bit of the query from where the blockhash ends to the end of query
-        // NOTE: Not needed anymore now that we have the first and last chunk pattern.
-        // uint16 blockHashOffset; // where the pinned block hash starts in the query string
         BridgeDataType responseDataType; // data type to be extracted from graphQL response string
         bytes32 subgraphDeploymentID; // subgraph being queried
-        // dispute handling config
+        // DISPUTE HANLDING CONFIG
         uint208 proposalFreezePeriod; // undisputed queries can only be executed after this many blocks
         uint16 responseDataOffset; // index where the data starts in the response string
         uint8 minimumSlashableGRT; // minimum slashable GRT staked by indexers in order for undisputed proposal to pass
-        // uint8 minimumExternalStake; // minimum external tokens staked in order for undisputed proposal to pass
         uint8 resolutionThresholdSlashableGRT; // (30-99) percent of slashable GRT required for dispute resolution
-        // uint8 resolutionThresholdExternalStake; // (30-99) percentage of external stake required for dispute resolution
-        // address stakingToken; // erc20 token for external staking
     }
 
     function _subgraphBridgeID(SubgraphBridge memory subgraphBridge)

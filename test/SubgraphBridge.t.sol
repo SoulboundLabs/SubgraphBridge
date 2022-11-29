@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
+pragma abicoder v2;
 
 import "forge-std/Test.sol";
 import "../src/SubgraphBridge.sol";
 import "../src/dependencies/TheGraph/IDisputeManager.sol";
+import "../src/MockDispute.sol";
 
 contract SubgraphBridgeTest is Test {
     // @notice Contracts
@@ -63,6 +65,10 @@ contract SubgraphBridgeTest is Test {
     // vitalik address for testing
     address public vitalik = 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045;
 
+    // IERC20 public grt = IERC20(0xc944E90C64B2c07662A292be6244BDf05Cda44a7);
+
+    // address public grtMinter = 0x9Ac758AB77733b4150A901ebd659cbF8cB93ED66;
+
     function setUp() public {
         address staking = 0xF55041E37E12cD407ad00CE2910B8269B01263b9;
 
@@ -78,10 +84,7 @@ contract SubgraphBridgeTest is Test {
             proposalFreezePeriod,
             responseDataOffset,
             minimumSlashableGRT,
-            // minimumExternalStake,
             resolutionThresholdSlashableGRT
-            // resolutionThresholdExternalStake
-            // stakingToken
         );
 
         bridge.createSubgraphBridge(sampleBridge);
@@ -260,8 +263,8 @@ contract SubgraphBridgeTest is Test {
         vm.expectRevert("proposalCount must be 1");
         bridge.certifySubgraphResponse(
             blockHash1,
-            response1,
             bridgeId,
+            response1,
             attestationBytes
         );
         postSubgraphResponse();
@@ -273,13 +276,69 @@ contract SubgraphBridgeTest is Test {
         // do something
         bridge.certifySubgraphResponse(
             blockHash1,
-            response1,
             bridgeId,
+            response1,
             attestationBytes
         );
 
         // TODO: Create some new queries with other data types.
         assert(bridge.subgraphBridgeData(bridgeId, requestCID1) != 0);
+    }
+
+    function testDisputeCreation() public {
+        string memory response2 = "invalidResponse";
+
+        bytes32 responseCID2 = keccak256(bytes(response2));
+
+        bytes memory mockStakingData = vm.getCode("MockStaking.sol");
+
+        bytes memory mockDisputeData = vm.getDeployedCode("MockDispute.sol");
+
+        // etch the staking contract code
+        // vm.etch(0xF55041E37E12cD407ad00CE2910B8269B01263b9, mockStakingData);
+        vm.etch(0x0Cf97E609937418eBC8C209404B947cBC914F599, mockStakingData);
+        emit log_string("Updated code for the staking contract");
+        vm.etch(0x444c138bf2B151F28a713b0EE320240365A5BFC2, mockDisputeData);
+        emit log_string("Updated code for the dispute manager");
+
+        emit log_uint(
+            IStaking(0xF55041E37E12cD407ad00CE2910B8269B01263b9)
+                .getIndexerStakedTokens(
+                    0x583249CF83598A03eB2bB17559932FBD5EE67C59 //attestation indexer
+                )
+        );
+
+        bytes memory invalidResponseAttestation = abi.encodePacked(
+            requestCID1,
+            keccak256(bytes(response2)),
+            subgraphDeploymentId,
+            r,
+            s,
+            v
+        );
+
+        bridge.postSubgraphResponse(
+            blockHash1,
+            bridgeId,
+            response1,
+            attestationBytes
+        );
+
+        bridge.postSubgraphResponse(
+            blockHash1,
+            bridgeId,
+            response2,
+            invalidResponseAttestation
+        );
+        vm.expectRevert(
+            "certifySubgraphResponse: There is a query dispute for this request"
+        );
+        bridge.certifySubgraphResponse(
+            blockHash1,
+            bridgeId,
+            response2,
+            invalidResponseAttestation
+        );
     }
 
     function testCertifySubgraphResponse() public {
