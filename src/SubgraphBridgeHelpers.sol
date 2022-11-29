@@ -31,8 +31,15 @@ contract SubgraphBridgeManagerHelpers {
     struct SubgraphBridgeProposals {
         // {attestation.responseCID} -> {stake}
         mapping(bytes32 => BridgeStake) stake;
+        ResponseProposal[] responseProposals;
         BridgeStakeTokens totalStake;
         uint256 proposalCount;
+    }
+
+    struct ResponseProposal {
+        bytes32 responseCID;
+        bytes attestationData;
+        uint256 proposalBlockNumber;
     }
 
     struct BridgeStake {
@@ -53,33 +60,17 @@ contract SubgraphBridgeManagerHelpers {
         // todo: string
     }
 
-    // TODO: Maybe combine first and last chunk of the query into a single bytes value, and store the split location somewhere else.
     struct SubgraphBridge {
+        // QUERY AND RESPONSE CONFIG
         bytes queryFirstChunk; // the first bit of the query up to where the blockhash starts
         bytes queryLastChunk; // the last bit of the query from where the blockhash ends to the end of query
-        uint16 responseDataOffset; // index where the data starts in the response string
-        // NOTE: Not needed anymore now that we have the first and last chunk pattern.
-        // uint16 blockHashOffset; // where the pinned block hash starts in the query string
         BridgeDataType responseDataType; // data type to be extracted from graphQL response string
         bytes32 subgraphDeploymentID; // subgraph being queried
-
-        // dispute handling config
-        uint8 proposalFreezePeriod; // undisputed queries can only be executed after this many blocks
+        // DISPUTE HANLDING CONFIG
+        uint208 proposalFreezePeriod; // undisputed queries can only be executed after this many blocks
+        uint16 responseDataOffset; // index where the data starts in the response string
         uint8 minimumSlashableGRT; // minimum slashable GRT staked by indexers in order for undisputed proposal to pass
-        uint8 minimumExternalStake; // minimum external tokens staked in order for undisputed proposal to pass
-        uint8 disputeResolutionWindow; // how many blocks it takes for disputes to be settled (0 indicates no dispute resolution)
         uint8 resolutionThresholdSlashableGRT; // (30-99) percent of slashable GRT required for dispute resolution
-        uint8 resolutionThresholdExternalStake; // (30-99) percentage of external stake required for dispute resolution
-        address stakingToken; // erc20 token for external staking
-    }
-
-    //TODO: Update this to hash something important now that query template is different
-    function hashQueryTemplate(string memory queryTemplate)
-        public
-        pure
-        returns (bytes32)
-    {
-        return keccak256(abi.encode(queryTemplate));
     }
 
     function _subgraphBridgeID(SubgraphBridge memory subgraphBridge)
@@ -211,25 +202,56 @@ contract SubgraphBridgeManagerHelpers {
         return tempBytes32;
     }
 
-    function toHex16 (bytes16 data) internal pure returns (bytes32 result) {
-    result = bytes32 (data) & 0xFFFFFFFFFFFFFFFF000000000000000000000000000000000000000000000000 |
-          (bytes32 (data) & 0x0000000000000000FFFFFFFFFFFFFFFF00000000000000000000000000000000) >> 64;
-    result = result & 0xFFFFFFFF000000000000000000000000FFFFFFFF000000000000000000000000 |
-          (result & 0x00000000FFFFFFFF000000000000000000000000FFFFFFFF0000000000000000) >> 32;
-    result = result & 0xFFFF000000000000FFFF000000000000FFFF000000000000FFFF000000000000 |
-          (result & 0x0000FFFF000000000000FFFF000000000000FFFF000000000000FFFF00000000) >> 16;
-    result = result & 0xFF000000FF000000FF000000FF000000FF000000FF000000FF000000FF000000 |
-          (result & 0x00FF000000FF000000FF000000FF000000FF000000FF000000FF000000FF0000) >> 8;
-    result = (result & 0xF000F000F000F000F000F000F000F000F000F000F000F000F000F000F000F000) >> 4 |
-          (result & 0x0F000F000F000F000F000F000F000F000F000F000F000F000F000F000F000F00) >> 8;
-    result = bytes32 (0x3030303030303030303030303030303030303030303030303030303030303030 +
-           uint256 (result) +
-           (uint256 (result) + 0x0606060606060606060606060606060606060606060606060606060606060606 >> 4 &
-           // 0x0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F) * 7);
-           0x0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F) * 39);
+    function toHex16(bytes16 data) internal pure returns (bytes32 result) {
+        result =
+            (bytes32(data) &
+                0xFFFFFFFFFFFFFFFF000000000000000000000000000000000000000000000000) |
+            ((bytes32(data) &
+                0x0000000000000000FFFFFFFFFFFFFFFF00000000000000000000000000000000) >>
+                64);
+        result =
+            (result &
+                0xFFFFFFFF000000000000000000000000FFFFFFFF000000000000000000000000) |
+            ((result &
+                0x00000000FFFFFFFF000000000000000000000000FFFFFFFF0000000000000000) >>
+                32);
+        result =
+            (result &
+                0xFFFF000000000000FFFF000000000000FFFF000000000000FFFF000000000000) |
+            ((result &
+                0x0000FFFF000000000000FFFF000000000000FFFF000000000000FFFF00000000) >>
+                16);
+        result =
+            (result &
+                0xFF000000FF000000FF000000FF000000FF000000FF000000FF000000FF000000) |
+            ((result &
+                0x00FF000000FF000000FF000000FF000000FF000000FF000000FF000000FF0000) >>
+                8);
+        result =
+            ((result &
+                0xF000F000F000F000F000F000F000F000F000F000F000F000F000F000F000F000) >>
+                4) |
+            ((result &
+                0x0F000F000F000F000F000F000F000F000F000F000F000F000F000F000F000F00) >>
+                8);
+        result = bytes32(
+            0x3030303030303030303030303030303030303030303030303030303030303030 +
+                uint256(result) +
+                (((uint256(result) +
+                    0x0606060606060606060606060606060606060606060606060606060606060606) >>
+                    4) &
+                    // 0x0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F) * 7);
+                    0x0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F) *
+                39
+        );
     }
 
-    function toHexBytes (bytes32 data) public pure returns (bytes memory) {
-        return abi.encodePacked ("0x", toHex16 (bytes16 (data)), toHex16 (bytes16 (data << 128)));
+    function toHexBytes(bytes32 data) public pure returns (bytes memory) {
+        return
+            abi.encodePacked(
+                "0x",
+                toHex16(bytes16(data)),
+                toHex16(bytes16(data << 128))
+            );
     }
 }
