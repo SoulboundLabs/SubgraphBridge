@@ -59,21 +59,16 @@ contract SubgraphBridgeTest is Test {
     uint8 resolutionThresholdExternalStake = 0;
     address stakingToken = address(0);
 
-    uint256 public defaultBlockNumber;
     bytes32 public bridgeId;
 
     // vitalik address for testing
     address public vitalik = 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045;
 
-    // IERC20 public grt = IERC20(0xc944E90C64B2c07662A292be6244BDf05Cda44a7);
+    address staking = 0xF55041E37E12cD407ad00CE2910B8269B01263b9;
 
-    // address public grtMinter = 0x9Ac758AB77733b4150A901ebd659cbF8cB93ED66;
+    address dispute = 0x97307b963662cCA2f7eD50e38dCC555dfFc4FB0b;
 
     function setUp() public {
-        address staking = 0xF55041E37E12cD407ad00CE2910B8269B01263b9;
-
-        address dispute = 0x97307b963662cCA2f7eD50e38dCC555dfFc4FB0b;
-
         bridge = new SubgraphBridgeManager(staking, dispute);
 
         sampleBridge = SubgraphBridgeManagerHelpers.SubgraphBridge(
@@ -91,9 +86,7 @@ contract SubgraphBridgeTest is Test {
 
         bridgeId = bridge._subgraphBridgeID(sampleBridge);
 
-        // emit log_bytes32(bridgeId);
-
-        defaultBlockNumber = block.number;
+        bridge.pinBlockHash(blockNumber1, blockHash1);
     }
 
     function testIfDeployed() public view {
@@ -269,11 +262,15 @@ contract SubgraphBridgeTest is Test {
         );
         postSubgraphResponse();
 
-        // TODO: REFACTOR HOW THE TIME CHECKS WORK FOR THE PROPOSAL STILL FROZEN REQUIRE STATEMENT
-        // vm.expectRevert()
-        vm.warp(25 minutes);
-        vm.prank(vitalik);
-        // do something
+        vm.expectRevert("proposal still frozen");
+        bridge.certifySubgraphResponse(
+            blockHash1,
+            bridgeId,
+            response1,
+            attestationBytes
+        );
+
+        vm.roll(block.number + 100);
         bridge.certifySubgraphResponse(
             blockHash1,
             bridgeId,
@@ -295,17 +292,15 @@ contract SubgraphBridgeTest is Test {
         bytes memory mockDisputeData = vm.getDeployedCode("MockDispute.sol");
 
         // etch the staking contract code
-        // vm.etch(0xF55041E37E12cD407ad00CE2910B8269B01263b9, mockStakingData);
-        vm.etch(0x0Cf97E609937418eBC8C209404B947cBC914F599, mockStakingData);
+        vm.etch(staking, mockStakingData);
         emit log_string("Updated code for the staking contract");
-        vm.etch(0x444c138bf2B151F28a713b0EE320240365A5BFC2, mockDisputeData);
+        vm.etch(dispute, mockDisputeData);
         emit log_string("Updated code for the dispute manager");
 
         emit log_uint(
-            IStaking(0xF55041E37E12cD407ad00CE2910B8269B01263b9)
-                .getIndexerStakedTokens(
-                    0x583249CF83598A03eB2bB17559932FBD5EE67C59 //attestation indexer
-                )
+            IStaking(staking).getIndexerStakedTokens(
+                0x583249CF83598A03eB2bB17559932FBD5EE67C59 //attestation indexer
+            )
         );
 
         bytes memory invalidResponseAttestation = abi.encodePacked(
@@ -338,6 +333,19 @@ contract SubgraphBridgeTest is Test {
             bridgeId,
             response2,
             invalidResponseAttestation
+        );
+
+        // simulate the resolution of the disputes
+        MockDispute(dispute).disputeResolve();
+
+        vm.roll(block.number + 100);
+
+        // this should work because there isn't a dispute open
+        bridge.certifySubgraphResponse(
+            blockHash1,
+            bridgeId,
+            response1,
+            attestationBytes
         );
     }
 

@@ -39,6 +39,7 @@ contract SubgraphBridgeManagerHelpers {
     struct ResponseProposal {
         bytes32 responseCID;
         bytes attestationData;
+        uint256 proposalBlockNumber;
     }
 
     struct BridgeStake {

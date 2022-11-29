@@ -28,6 +28,8 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
     // {requestCID} -> {disputeId[]}
     mapping(bytes32 => bytes32[]) public queryDisputes;
 
+    event log(uint256 num);
+
     event SubgraphBridgeCreation(
         address bridgeCreator,
         bytes32 subgraphBridgeId,
@@ -120,13 +122,17 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
                 .attestationStake == 0
         ) {
             proposals.proposalCount = proposals.proposalCount + 1;
-
-            // require(pinnedBlocks[blockHash] > 0, "block hash unpinned");
         }
-
-        // push this attestation and data to the response array
+        // if this is the first proposal, use this block number to start the dispute window
+        uint256 firstBlockNumber = proposals.responseProposals.length > 0
+            ? proposals.responseProposals[0].proposalBlockNumber
+            : block.number;
         proposals.responseProposals.push(
-            ResponseProposal(attestation.responseCID, attestationData)
+            ResponseProposal(
+                attestation.responseCID,
+                attestationData,
+                firstBlockNumber
+            )
         );
 
         // update stake values
@@ -187,28 +193,34 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         );
         bytes32 requestCID = attestation.requestCID;
         require(
-            !isQueryDisputed(requestCID),
+            !isQueryDisputed(attestation.requestCID),
             "certifySubgraphResponse: There is a query dispute for this request"
         );
 
         uint208 proposalFreezePeriod = subgraphBridges[subgraphBridgeId]
             .proposalFreezePeriod;
+
         uint8 minimumSlashableGRT = subgraphBridges[subgraphBridgeId]
             .minimumSlashableGRT;
-
-        require(
-            pinnedBlocks[_blockhash] + proposalFreezePeriod <= block.number,
-            "proposal still frozen"
-        );
 
         SubgraphBridgeProposals storage proposals = subgraphBridgeProposals[
             subgraphBridgeId
         ][requestCID];
+
         //TODO: SANITY CHECK THIS AND SEE IF WE MEAN EQUAL TO GREATER THAN OR EQUAL TO
         // require(proposals.proposalCount == 1, "proposalCount must be 1");
         require(
             proposals.proposalCount >= 1,
             "proposalCount must be at least 1"
+        );
+
+        uint256 proposalFirstBlock = proposals
+            .responseProposals[0]
+            .proposalBlockNumber;
+
+        require(
+            proposalFirstBlock + proposalFreezePeriod <= block.number,
+            "proposal still frozen"
         );
 
         bytes32 responseCID = keccak256(abi.encodePacked(response));
@@ -220,7 +232,6 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         );
 
         _extractData(subgraphBridgeId, requestCID, response);
-
         emit QueryResultFinalized(subgraphBridgeId, requestCID, response);
     }
 
@@ -298,7 +309,7 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
     // TODO: MAYBE MAKE THIS AN ADMIN FUNCTION?
     // NOT SURE HOW WE WANT TO HANDLE PEOPLE JUST PINNING RANDOM BLOCKS
     // since blockhash only returns values for the most recent 256 blocks
-    function pinBlockHash(uint256 blockNumber) public {
+    function pinBlockHash(uint256 blockNumber, bytes32 blockHash) public {
         require(
             pinnedBlocks[blockhash(blockNumber)] == 0,
             "pinBlockHash: already pinned!"

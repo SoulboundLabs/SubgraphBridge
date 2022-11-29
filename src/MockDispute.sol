@@ -27,4 +27,9 @@ contract MockDispute {
     function isDisputeCreated(bytes32 _disputeID) external view returns (bool) {
         return disputed1 && disputed2;
     }
+
+    function disputeResolve() public {
+        disputed1 = false;
+        disputed2 = false;
+    }
 }
