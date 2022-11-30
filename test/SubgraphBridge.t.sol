@@ -52,8 +52,7 @@ contract SubgraphBridgeTest is Test {
         SubgraphBridgeManagerHelpers.BridgeDataType.BYTES32;
 
     uint8 proposalFreezePeriod = 69;
-    uint8 minimumSlashableGRT = 100;
-    uint8 minimumExternalStake = 0;
+    uint256 minimumSlashableGRT = 100;
     uint8 disputeResolutionWindow = 100; // 100 blocks or 25 minutes
     uint8 resolutionThresholdSlashableGRT = 50;
     uint8 resolutionThresholdExternalStake = 0;
@@ -78,8 +77,7 @@ contract SubgraphBridgeTest is Test {
             subgraphDeploymentId,
             proposalFreezePeriod,
             responseDataOffset,
-            minimumSlashableGRT,
-            resolutionThresholdSlashableGRT
+            minimumSlashableGRT
         );
 
         bridge.createSubgraphBridge(sampleBridge);

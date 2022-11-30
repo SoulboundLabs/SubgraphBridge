@@ -226,7 +226,7 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         uint208 proposalFreezePeriod = subgraphBridges[subgraphBridgeID]
             .proposalFreezePeriod;
 
-        uint8 minimumSlashableGRT = subgraphBridges[subgraphBridgeID]
+        uint256 minimumSlashableGRT = subgraphBridges[subgraphBridgeID]
             .minimumSlashableGRT;
 
         SubgraphBridgeProposals storage proposals = subgraphBridgeProposals[
