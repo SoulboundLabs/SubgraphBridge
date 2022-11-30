@@ -86,7 +86,7 @@ contract SubgraphBridgeTest is Test {
 
         bridgeId = bridge._subgraphBridgeID(sampleBridge);
 
-        bridge.pinBlockHash(blockNumber1, blockHash1);
+        bridge.pinBlockHash(blockNumber1);
     }
 
     function testIfDeployed() public view {
@@ -117,7 +117,7 @@ contract SubgraphBridgeTest is Test {
 
         assertEq(
             bridge.queryAndResponseMatchAttestation(
-                blockHash1,
+                blockhash(blockNumber1),
                 bridgeId,
                 response1,
                 attestation
@@ -157,7 +157,7 @@ contract SubgraphBridgeTest is Test {
     function postSubgraphResponse() public {
         // should work
         bridge.postSubgraphResponse(
-            blockHash1,
+            blockNumber1,
             bridgeId,
             response1,
             attestationBytes
@@ -169,7 +169,7 @@ contract SubgraphBridgeTest is Test {
         bytes32 badBridgeId = keccak256("hey");
         vm.expectRevert("query bridge doesn't exist");
         bridge.postSubgraphResponse(
-            blockHash1,
+            blockNumber1,
             badBridgeId,
             response1,
             attestationBytes
@@ -178,7 +178,7 @@ contract SubgraphBridgeTest is Test {
         // if we submit an invalid attestation it should revert
         vm.expectRevert("Attestation must be 161 bytes long");
         bridge.postSubgraphResponse(
-            blockHash1,
+            blockNumber1,
             bridgeId,
             response1,
             bytes.concat(attestationBytes, "testing")
@@ -197,7 +197,7 @@ contract SubgraphBridgeTest is Test {
             "queryAndResponseMatchAttestation: RequestCID Doesn't Match"
         );
         bridge.postSubgraphResponse(
-            blockHash1,
+            blockNumber1,
             bridgeId,
             response1,
             invalidRequest
@@ -216,7 +216,7 @@ contract SubgraphBridgeTest is Test {
             bytes("queryAndResponseMatchAttestation: ResponseCID Doesn't Match")
         );
         bridge.postSubgraphResponse(
-            blockHash1,
+            blockNumber1,
             bridgeId,
             response1,
             invalidResponse
@@ -235,7 +235,7 @@ contract SubgraphBridgeTest is Test {
             "queryAndResponseMatchAttestation: SubgraphDeploymentID Doesn't Match"
         );
         bridge.postSubgraphResponse(
-            blockHash1,
+            blockNumber1,
             bridgeId,
             response1,
             invalidSubgraphDeploymentID
@@ -243,7 +243,7 @@ contract SubgraphBridgeTest is Test {
 
         vm.expectRevert("query bridge doesn't exist");
         bridge.postSubgraphResponse(
-            blockHash1,
+            blockNumber1,
             keccak256("invalidBridgeId"),
             response1,
             attestationBytes
@@ -254,29 +254,14 @@ contract SubgraphBridgeTest is Test {
 
     function certifySubgraphResponse() public {
         vm.expectRevert("proposalCount must be at least 1");
-        bridge.certifySubgraphResponse(
-            blockHash1,
-            bridgeId,
-            response1,
-            attestationBytes
-        );
+        bridge.certifySubgraphResponse(bridgeId, response1, attestationBytes);
         postSubgraphResponse();
 
         vm.expectRevert("proposal still frozen");
-        bridge.certifySubgraphResponse(
-            blockHash1,
-            bridgeId,
-            response1,
-            attestationBytes
-        );
+        bridge.certifySubgraphResponse(bridgeId, response1, attestationBytes);
 
         vm.roll(block.number + 100);
-        bridge.certifySubgraphResponse(
-            blockHash1,
-            bridgeId,
-            response1,
-            attestationBytes
-        );
+        bridge.certifySubgraphResponse(bridgeId, response1, attestationBytes);
 
         // TODO: Create some new queries with other data types.
         assert(bridge.subgraphBridgeData(bridgeId, requestCID1) != 0);
@@ -305,7 +290,7 @@ contract SubgraphBridgeTest is Test {
 
         bytes memory invalidResponseAttestation = abi.encodePacked(
             requestCID1,
-            keccak256(bytes(response2)),
+            responseCID2,
             subgraphDeploymentId,
             r,
             s,
@@ -313,14 +298,14 @@ contract SubgraphBridgeTest is Test {
         );
 
         bridge.postSubgraphResponse(
-            blockHash1,
+            blockNumber1,
             bridgeId,
             response1,
             attestationBytes
         );
 
         bridge.postSubgraphResponse(
-            blockHash1,
+            blockNumber1,
             bridgeId,
             response2,
             invalidResponseAttestation
@@ -329,7 +314,6 @@ contract SubgraphBridgeTest is Test {
             "certifySubgraphResponse: There is a query dispute for this request"
         );
         bridge.certifySubgraphResponse(
-            blockHash1,
             bridgeId,
             response2,
             invalidResponseAttestation
@@ -341,12 +325,7 @@ contract SubgraphBridgeTest is Test {
         vm.roll(block.number + 100);
 
         // this should work because there isn't a dispute open
-        bridge.certifySubgraphResponse(
-            blockHash1,
-            bridgeId,
-            response1,
-            attestationBytes
-        );
+        bridge.certifySubgraphResponse(bridgeId, response1, attestationBytes);
     }
 
     function testCertifySubgraphResponse() public {
