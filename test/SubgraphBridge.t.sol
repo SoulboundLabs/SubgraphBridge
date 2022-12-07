@@ -262,7 +262,10 @@ contract SubgraphBridgeTest is Test {
         bridge.certifySubgraphResponse(bridgeId, response1, attestationBytes);
 
         // TODO: Create some new queries with other data types.
-        assert(bridge.subgraphBridgeData(bridgeId, requestCID1) != 0);
+        assert(
+            keccak256(bridge.subgraphBridgeData(bridgeId, requestCID1)) !=
+                keccak256(bytes(""))
+        );
     }
 
     function testDisputeCreation() public {

@@ -253,4 +253,16 @@ contract SubgraphBridgeManagerHelpers {
                 toHex16(bytes16(data << 128))
             );
     }
+
+    function _addressFromString(string memory _a, uint256 _offset)
+        public
+        pure
+        returns (address)
+    {
+        bytes memory bresult = bytes(_a);
+        bytes20 result = 0;
+        for (uint256 i = 0; i < 20; i++)
+            result |= (bytes20(bresult[i + _offset]) >> (8 * (19 - i)));
+        return address(result);
+    }
 }

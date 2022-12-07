@@ -18,7 +18,9 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
     /**
     @notice A mapping storing blockhashes -> blocknumber
     */
-    mapping(bytes32 => uint256) public pinnedBlocks;
+    // mapping(bytes32 => uint256) public pinnedBlocks;
+
+    mapping(uint256 => bytes32) public pinnedBlocks;
 
     /**
     @notice A mapping storing subgraphBridgID -> SubgraphBridge
@@ -32,9 +34,9 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         public subgraphBridgeProposals;
 
     /**
-     *@notice A mapping storing subgraphBridgeID -> RequestCID -> ResponseData (encoded as uint256)
+     *@notice A mapping storing subgraphBridgeID -> RequestCID -> ResponseDataBytes
      */
-    mapping(bytes32 => mapping(bytes32 => uint256)) public subgraphBridgeData;
+    mapping(bytes32 => mapping(bytes32 => bytes)) public subgraphBridgeData;
 
     /**
      *@notice A mapping storing requestCID -> DisputeID Array
@@ -50,7 +52,13 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
     event SubgraphBridgeCreation(
         address bridgeCreator,
         bytes32 subgraphBridgeId,
-        bytes32 subgraphDeploymentID
+        bytes32 subgraphDeploymentID,
+        bytes queryFirstChunk,
+        bytes queryLastChunk,
+        uint256 responseDataType,
+        uint208 proposalFreezePeriod,
+        uint16 responseDataOffset,
+        uint256 minimumSlashableGRT
     );
 
     event SubgraphResponseAdded(
@@ -86,7 +94,13 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         emit SubgraphBridgeCreation(
             msg.sender,
             subgraphBridgeID,
-            subgraphBridge.subgraphDeploymentID
+            subgraphBridge.subgraphDeploymentID,
+            subgraphBridge.queryFirstChunk,
+            subgraphBridge.queryLastChunk,
+            uint256(subgraphBridge.responseDataType),
+            subgraphBridge.proposalFreezePeriod,
+            subgraphBridge.responseDataOffset,
+            subgraphBridge.minimumSlashableGRT
         );
     }
 
@@ -104,9 +118,13 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         string calldata response,
         bytes calldata attestationData
     ) public {
-        bytes32 blockHash = blockhash(blockNumber);
+        if(pinnedBlocks[blockNumber] == 0) {
+          pinBlockHash(blockNumber);
+        }
 
-        require(pinnedBlocks[blockHash] != 0, "Block not pinned");
+        bytes32 blockHash = pinnedBlocks[blockNumber];
+
+        require(pinnedBlocks[blockNumber] != 0, "Block not pinned");
 
         require(
             subgraphBridges[subgraphBridgeID].responseDataOffset != 0,
@@ -363,10 +381,11 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
             "Pinned block must be within the last 256 blocks"
         );
         require(
-            pinnedBlocks[blockhash(blockNumber)] == 0,
+            // pinnedBlocks[blockhash(blockNumber)] == 0,
+            pinnedBlocks[blockNumber] == 0,
             "pinBlockHash: already pinned!"
         );
-        pinnedBlocks[blockhash(blockNumber)] = blockNumber;
+        pinnedBlocks[blockNumber] = blockhash(blockNumber);
     }
 
     //TODO: HANDLE ALL DATA TYPES
@@ -385,21 +404,24 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
             .responseDataType;
 
         if (_type == BridgeDataType.UINT) {
-            subgraphBridgeData[subgraphBridgeID][requestCID] = _uintFromString(
-                response,
-                subgraphBridges[subgraphBridgeID].responseDataOffset
+            subgraphBridgeData[subgraphBridgeID][requestCID] = abi.encodePacked(
+                _uintFromString(
+                    response,
+                    subgraphBridges[subgraphBridgeID].responseDataOffset
+                )
             );
         } else if (_type == BridgeDataType.ADDRESS) {
             //DO SOMETHING ELSE
-            /*
-            subgraphBridgeData[subgraphBridgeID][requestCID] = _addressFromString(
-                response,
-                subgraphBridges[subgraphBridgeID].responseDataOffset
+
+            subgraphBridgeData[subgraphBridgeID][requestCID] = abi.encodePacked(
+                _addressFromString(
+                    response,
+                    subgraphBridges[subgraphBridgeID].responseDataOffset
+                )
             );
-            */
         } else if (_type == BridgeDataType.BYTES32) {
             //DO ANOTHER THING
-            subgraphBridgeData[subgraphBridgeID][requestCID] = uint256(
+            subgraphBridgeData[subgraphBridgeID][requestCID] = abi.encodePacked(
                 _bytes32FromString(
                     response,
                     subgraphBridges[subgraphBridgeID].responseDataOffset
