@@ -24,6 +24,7 @@ contract QueryCreation is Test {
     // default query first chunk hex
     bytes public firstChunk =
         hex"7b227175657279223a227b5c6e2020626f6e6465724164646564732866697273743a2031302c20626c6f636b3a207b686173683a205c22";
+
     // default query last chunk hex
     bytes public lastChunk =
         hex"5c227d29207b5c6e2020202069645c6e20207d5c6e7d5c6e222c227661726961626c6573223a7b7d7d";

@@ -254,15 +254,40 @@ contract SubgraphBridgeManagerHelpers {
             );
     }
 
-    function _addressFromString(string memory _a, uint256 _offset)
+    function _addressFromString(string memory str, uint256 start)
         public
         pure
         returns (address)
     {
-        bytes memory bresult = bytes(_a);
-        bytes20 result = 0;
-        for (uint256 i = 0; i < 20; i++)
-            result |= (bytes20(bresult[i + _offset]) >> (8 * (19 - i)));
-        return address(result);
+        bytes memory b = bytes(str);
+        uint256 result = 0;
+        for (uint256 i = start; i < 42; i++) {
+            uint256 c = uint8(b[i]);
+            if (c >= 48 && c <= 57) {
+                result = result * 16 + (c - 48);
+            }
+            if (c >= 65 && c <= 70) {
+                result = result * 16 + (c - 55);
+            }
+            if (c >= 97 && c <= 102) {
+                result = result * 16 + (c - 87);
+            }
+        }
+
+        return address(uint160(result));
+    }
+
+    function st2num(string memory numString) public pure returns (uint256) {
+        uint256 val = 0;
+        bytes memory stringBytes = bytes(numString);
+        for (uint256 i = 0; i < stringBytes.length; i++) {
+            uint256 exp = stringBytes.length - i;
+            bytes1 ival = stringBytes[i]; // the char byte
+            uint8 uval = uint8(ival); // the char byte as a uint8
+            uint256 jval = uval - uint256(0x30); // the char byte as a uint8 minus 0x30
+
+            val += (uint256(jval) * (10**(exp - 1))); // multiply by the appropriate power of 10
+        }
+        return val;
     }
 }
