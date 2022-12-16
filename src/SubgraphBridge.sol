@@ -428,8 +428,6 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
                 )
             );
         } else if (_type == BridgeDataType.ADDRESS) {
-            //DO SOMETHING ELSE
-
             subgraphBridgeData[subgraphBridgeID][requestCID] = abi.encodePacked(
                 _addressFromString(
                     response,
@@ -437,7 +435,6 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
                 )
             );
         } else if (_type == BridgeDataType.BYTES32) {
-            //DO ANOTHER THING
             subgraphBridgeData[subgraphBridgeID][requestCID] = abi.encodePacked(
                 _bytes32FromString(
                     response,
