@@ -39,11 +39,6 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
     mapping(bytes32 => mapping(bytes32 => bytes)) public subgraphBridgeData;
 
     /**
-     *@notice A mapping storing requestCID -> DisputeID Array
-     */
-    mapping(bytes32 => bytes32[]) public queryDisputes;
-
-    /**
      *@notice The latest subgraph bridge data for a subgraphBridgeID
      */
     mapping(bytes32 => bytes) public latestSubgraphBridgeData;
@@ -164,14 +159,6 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
             subgraphBridgeID
         ][attestation.requestCID];
 
-        if (
-            proposals
-                .stake[attestation.responseCID]
-                .totalStake
-                .attestationStake == 0
-        ) {
-            proposals.proposalCount = proposals.proposalCount + 1;
-        }
         // if this is the first proposal, use this block number to start the dispute window
         uint256 firstBlockNumber = proposals.responseProposals.length > 0
             ? proposals.responseProposals[0].proposalBlockNumber
@@ -181,26 +168,14 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
             ResponseProposal(
                 attestation.responseCID,
                 attestationData,
-                firstBlockNumber
+                firstBlockNumber,
+                indexerStake
             )
         );
 
-        // update stake values
-        proposals
-            .stake[attestation.responseCID]
-            .accountStake[attestationIndexer]
-            .attestationStake = indexerStake;
-
-        proposals.stake[attestation.responseCID].totalStake.attestationStake =
-            proposals
-                .stake[attestation.responseCID]
-                .totalStake
-                .attestationStake +
-            indexerStake;
-
-        proposals.totalStake.attestationStake =
-            proposals.totalStake.attestationStake +
-            indexerStake;
+        // TODO: Check if this is secure, maybe we don't actually care about the total stake
+        // update total stake values
+        proposals.totalStake += indexerStake;
 
         // loop over all of the responseProposals and check if the responseCID is equal for all of them, if not open a new conflict
         for (uint256 i; i < proposals.responseProposals.length; i++) {
@@ -210,8 +185,6 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
                 createQueryDispute(
                     subgraphBridgeID,
                     attestation.requestCID,
-                    attestation.responseCID, //responseCID of this proposal
-                    _responseCID, //responseCID of the conflicting proposal
                     i, // index of the conflicting proposal
                     proposals.responseProposals.length - 1 // index of the submitted proposal
                 );
@@ -249,7 +222,7 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         );
         bytes32 requestCID = attestation.requestCID;
         require(
-            !isQueryDisputed(attestation.requestCID),
+            !isQueryDisputed(subgraphBridgeID, attestation.requestCID),
             "certifySubgraphResponse: There is a query dispute for this request"
         );
 
@@ -264,8 +237,8 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         ][requestCID];
 
         require(
-            proposals.proposalCount >= 1,
-            "proposalCount must be at least 1"
+            proposals.responseProposals.length >= 1,
+            "proposal count must be at least 1"
         );
 
         uint256 proposalFirstBlock = proposals
@@ -277,13 +250,8 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
             "proposal still frozen"
         );
 
-        bytes32 responseCID = keccak256(abi.encodePacked(response));
-
-        require(
-            proposals.stake[responseCID].totalStake.attestationStake >
-                minimumSlashableGRT,
-            "not enough stake"
-        );
+        // TODO: Double check this
+        require(proposals.totalStake > minimumSlashableGRT, "not enough stake");
 
         _extractData(subgraphBridgeID, requestCID, response);
 
@@ -291,6 +259,7 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         latestSubgraphBridgeData[subgraphBridgeID] = subgraphBridgeData[
             subgraphBridgeID
         ][requestCID];
+
         emit QueryResultFinalized(subgraphBridgeID, requestCID, response);
     }
 
@@ -302,16 +271,12 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
      *@notice this function is used to open a dispute for two conflicting proposals
      *@param subgraphBridgeID, the ID of the subgraph bridge
      *@param requestCID, the CID of the request
-     *@param responseCID1, the CID of the first response
-     *@param responseCID2, the CID of the second response
      *@param attestationIndex1, the index of the attestation for the first response within subgraphBridgeProposals
      *@param attestationIndex2, the index of the attestation for the second response within subgraphBridgeProposals
      */
     function createQueryDispute(
         bytes32 subgraphBridgeID,
         bytes32 requestCID,
-        bytes32 responseCID1,
-        bytes32 responseCID2,
         uint256 attestationIndex1,
         uint256 attestationIndex2
     ) internal returns (bytes32 disputeID1, bytes32 disputeID2) {
@@ -324,14 +289,16 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
             subgraphBridgeID
         ][requestCID];
 
-        require(
-            proposals.stake[responseCID1].totalStake.attestationStake > 0,
-            "responseCID1 doesn't exist"
-        );
-        require(
-            proposals.stake[responseCID2].totalStake.attestationStake > 0,
-            "responseCID2 doesn't exist"
-        );
+        bytes32 responseCID1 = proposals
+            .responseProposals[attestationIndex1]
+            .responseCID;
+
+        bytes32 responseCID2 = proposals
+            .responseProposals[attestationIndex2]
+            .responseCID;
+
+        require(responseCID1 != bytes32(0), "responseCID1 doesn't exist");
+        require(responseCID2 != bytes32(0), "responseCID2 doesn't exist");
 
         require(
             responseCID1 != responseCID2,
@@ -352,8 +319,11 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         ).createQueryDisputeConflict(attestationBytes1, attestationBytes2);
 
         // push the disputeIDs to the disputeID array
-        queryDisputes[requestCID].push(_disputeID1);
-        queryDisputes[requestCID].push(_disputeID2);
+        bytes32[] storage disputes = subgraphBridgeProposals[subgraphBridgeID][
+            requestCID
+        ].disputes;
+        disputes.push(_disputeID1);
+        disputes.push(_disputeID2);
 
         // emit a SubgrapuQueryDisputed event for both disputes
         emit SubgraphQueryDisputeCreated(
@@ -375,11 +345,19 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
      *@param requestCID the requestCID of the query
      *@return true if the query is being disputed, false if not
      */
-    function isQueryDisputed(bytes32 requestCID) public view returns (bool) {
-        for (uint256 i = 0; i < queryDisputes[requestCID].length; i++) {
+    function isQueryDisputed(bytes32 bridgeID, bytes32 requestCID)
+        public
+        view
+        returns (bool)
+    {
+        bytes32[] storage queryDisputes = subgraphBridgeProposals[bridgeID][
+            requestCID
+        ].disputes;
+        for (uint256 i = 0; i < queryDisputes.length; i++) {
             if (
+                // TODO: CHECK THIS FUNCTION AFTER REFACTORING
                 IDisputeManager(theGraphDisputeManager).isDisputeCreated(
-                    queryDisputes[requestCID][i]
+                    queryDisputes[i]
                 )
             ) {
                 return true;

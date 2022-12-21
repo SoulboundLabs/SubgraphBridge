@@ -254,7 +254,7 @@ contract SubgraphBridgeTest is Test {
     }
 
     function certifySubgraphResponse() public {
-        vm.expectRevert("proposalCount must be at least 1");
+        vm.expectRevert("proposal count must be at least 1");
         bridge.certifySubgraphResponse(bridgeId, response1, attestationBytes);
         postSubgraphResponse();
 

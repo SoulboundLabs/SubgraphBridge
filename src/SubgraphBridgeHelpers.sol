@@ -29,27 +29,16 @@ contract SubgraphBridgeManagerHelpers {
 
     // stored in mapping where (ID == attestation.requestCID)
     struct SubgraphBridgeProposals {
-        // {attestation.responseCID} -> {stake}
-        mapping(bytes32 => BridgeStake) stake;
         ResponseProposal[] responseProposals;
-        BridgeStakeTokens totalStake;
-        uint256 proposalCount;
+        uint256 totalStake; // stake of GRT tokens
+        bytes32[] disputes;
     }
 
     struct ResponseProposal {
         bytes32 responseCID;
         bytes attestationData;
         uint256 proposalBlockNumber;
-    }
-
-    struct BridgeStake {
-        BridgeStakeTokens totalStake;
-        mapping(address => BridgeStakeTokens) accountStake;
-    }
-
-    struct BridgeStakeTokens {
-        uint256 attestationStake; // Slashable GRT staked by indexers via the staking contract
-        uint256 tokenStake; // GRT staked by oracles through Subgraph Bridge contract
+        uint256 stake;
     }
 
     enum BridgeDataType {
