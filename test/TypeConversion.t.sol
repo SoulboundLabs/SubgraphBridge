@@ -13,7 +13,7 @@ contract TypeConversion is Test {
 
     // bytes32
     string public bytes32String =
-        "1c8aff950685c2ed4bc3174f3472287b56d9517b9c948127319a09a7a36deac8";
+        "0x1c8aff950685c2ed4bc3174f3472287b56d9517b9c948127319a09a7a36deac8";
     bytes32 public bytes32Bytes =
         0x1c8aff950685c2ed4bc3174f3472287b56d9517b9c948127319a09a7a36deac8;
 
@@ -32,7 +32,7 @@ contract TypeConversion is Test {
     }
 
     function testConvertBytes32() public {
-        bytes32 result = helpers._bytes32FromString(bytes32String, 0);
+        bytes32 result = helpers._bytes32FromString(bytes32String, 2);
         assertEq(abi.encodePacked(result), abi.encodePacked(bytes32Bytes));
     }
 

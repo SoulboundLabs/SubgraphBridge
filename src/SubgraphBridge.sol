@@ -398,14 +398,13 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
             "Pinned block must be within the last 256 blocks"
         );
         require(
-            // pinnedBlocks[blockhash(blockNumber)] == 0,
             pinnedBlocks[blockNumber] == 0,
             "pinBlockHash: already pinned!"
         );
         pinnedBlocks[blockNumber] = blockhash(blockNumber);
     }
 
-    //TODO: HANDLE ALL DATA TYPES
+    // TODO: Add in a check to get the length of the uint256 from the response string. Probably just checking to see if the last character is a \".
     /**
      *@notice this function takes in a subgraphBridgeID, a requestCID, and a responseCID and extracts the data from the responseCID and stores it in the subgraphBridgeData mapping
      *@param subgraphBridgeID, the ID of the subgraph bridge
@@ -438,7 +437,7 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
             subgraphBridgeData[subgraphBridgeID][requestCID] = abi.encodePacked(
                 _bytes32FromString(
                     response,
-                    subgraphBridges[subgraphBridgeID].responseDataOffset
+                    subgraphBridges[subgraphBridgeID].responseDataOffset + 2 // we are adding 2 to the offset because the response string has a 0x in front of it, and I didn't feel like messing with the algorithm for finding the offset to add an exception for the 0x
                 )
             );
         }
