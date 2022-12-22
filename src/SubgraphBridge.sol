@@ -6,34 +6,59 @@ import "./dependencies/TheGraph/IStaking.sol";
 import "./dependencies/TheGraph/IDisputeManager.sol";
 import "./SubgraphBridgeHelpers.sol";
 
-//@title SubgraphBridge
-//@notice SubgraphBridge is a contract that allows us to bridge subgraph data from The Graph's Decentralized Network to Ethereum in a cryptoeconomically secure manner.
+/**
+ * @title SubgraphBridge
+ * @dev SubgraphBridge is a contract that allows us to bridge subgraph data from The Graph's Decentralized Network to Ethereum in a cryptoeconomically secure manner.
+ * @author Soulbound Labs (Connor Dunham, Alexander Gusev, and Jordan Rein)
+ */
 contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
     address public theGraphStaking;
     address public theGraphDisputeManager;
 
-    // {block hash} -> {block number}
-    mapping(bytes32 => uint256) public pinnedBlocks;
+    /**
+    @notice A mapping storing blockhashes -> blocknumber
+    */
+    // mapping(bytes32 => uint256) public pinnedBlocks;
 
-    // {SubgraphBridgeID} -> {SubgraphBridge}
+    mapping(uint256 => bytes32) public pinnedBlocks;
+
+    /**
+    @notice A mapping storing subgraphBridgID -> SubgraphBridge
+     */
     mapping(bytes32 => SubgraphBridge) public subgraphBridges;
 
-    // {SubgraphBridgeID} -> {attestation.requestCID} -> {SubgraphBridgeProposals}
+    /**
+     *@notice A mapping storing subgraphBridgeID -> RequestCID -> SubgraphBridgeProposals
+     */
     mapping(bytes32 => mapping(bytes32 => SubgraphBridgeProposals))
         public subgraphBridgeProposals;
 
-    // {SubgraphBridgeID} -> {requestCID} -> {responseData}
-    mapping(bytes32 => mapping(bytes32 => uint256)) public subgraphBridgeData;
+    /**
+     *@notice A mapping storing subgraphBridgeID -> RequestCID -> ResponseDataBytes
+     */
+    mapping(bytes32 => mapping(bytes32 => bytes)) public subgraphBridgeData;
 
-    // {requestCID} -> {disputeId[]}
-    mapping(bytes32 => bytes32[]) public queryDisputes;
+    /**
+     *@notice The latest subgraph bridge data for a subgraphBridgeID
+     */
+    mapping(bytes32 => bytes) public latestSubgraphBridgeData;
 
-    event log(uint256 num);
+    event SubgraphQueryDisputeCreated(
+        bytes32 indexed subgraphBridgeID,
+        bytes32 indexed requestCID,
+        bytes32 disputeID
+    );
 
     event SubgraphBridgeCreation(
         address bridgeCreator,
         bytes32 subgraphBridgeId,
-        bytes32 subgraphDeploymentID
+        bytes32 subgraphDeploymentID,
+        bytes queryFirstChunk,
+        bytes queryLastChunk,
+        uint256 responseDataType,
+        uint208 proposalFreezePeriod,
+        uint16 responseDataOffset,
+        uint256 minimumSlashableGRT
     );
 
     event SubgraphResponseAdded(
@@ -41,7 +66,9 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         bytes32 subgraphBridgeID,
         bytes32 subgraphDeploymentID,
         string response,
-        bytes attestationData
+        bytes attestationData,
+        uint256 unlocksAt,
+        bytes32 requestCID
     );
 
     event QueryResultFinalized(
@@ -59,32 +86,48 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
     // PUBLIC FUNCTIONS TO BE USED BY THE MASSES
     // ============================================================
 
-    //@notice creates a query bridge
-    //@dummy create a way to get subgraph query results back on chain
+    /**
+     *@notice creates a query bridge
+     *@param subgraphBridge the subgraph bridge to be created
+     */
     function createSubgraphBridge(SubgraphBridge memory subgraphBridge) public {
         bytes32 subgraphBridgeID = _subgraphBridgeID(subgraphBridge); // set the subgraphId to the hashed SubgraphBridge
         subgraphBridges[subgraphBridgeID] = subgraphBridge;
         emit SubgraphBridgeCreation(
             msg.sender,
             subgraphBridgeID,
-            subgraphBridge.subgraphDeploymentID
+            subgraphBridge.subgraphDeploymentID,
+            subgraphBridge.queryFirstChunk,
+            subgraphBridge.queryLastChunk,
+            uint256(subgraphBridge.responseDataType),
+            subgraphBridge.proposalFreezePeriod,
+            subgraphBridge.responseDataOffset,
+            subgraphBridge.minimumSlashableGRT
         );
     }
 
-    // @notice, this function is used to provide an attestation for a query
-    // @dummy, whoever calls this is providing the data for ur query
-    // @param blockNumber, the block number of the block that the request was made for
-    // @param query, the query that was made
-    // @param response, the response of the query
-    // @param subgraphBridgeID, the ID of the subgraph bridge
-    // @param calldata attestation, the attestation of the response
+    /**
+     *@notice this function is used to provide an attestation for a query
+     *@param blockNumber, the block number of the block that the request was made for
+     *@param subgraphBridgeID, the ID of the subgraph bridge
+     *@param response, the response of the query
+     *@param attestationData the attestation of the response
+     */
 
     function postSubgraphResponse(
-        bytes32 blockHash,
+        uint256 blockNumber,
         bytes32 subgraphBridgeID,
         string calldata response,
         bytes calldata attestationData
     ) public {
+        if (pinnedBlocks[blockNumber] == 0) {
+            pinBlockHash(blockNumber);
+        }
+
+        bytes32 blockHash = pinnedBlocks[blockNumber];
+
+        require(pinnedBlocks[blockNumber] != 0, "Block not pinned");
+
         require(
             subgraphBridges[subgraphBridgeID].responseDataOffset != 0,
             "query bridge doesn't exist"
@@ -109,82 +152,68 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         uint256 indexerStake = IStaking(theGraphStaking).getIndexerStakedTokens(
             attestationIndexer
         );
+
         require(indexerStake > 0, "indexer doesn't have slashable stake");
 
         SubgraphBridgeProposals storage proposals = subgraphBridgeProposals[
             subgraphBridgeID
         ][attestation.requestCID];
 
-        if (
-            proposals
-                .stake[attestation.responseCID]
-                .totalStake
-                .attestationStake == 0
-        ) {
-            proposals.proposalCount = proposals.proposalCount + 1;
-        }
         // if this is the first proposal, use this block number to start the dispute window
         uint256 firstBlockNumber = proposals.responseProposals.length > 0
             ? proposals.responseProposals[0].proposalBlockNumber
             : block.number;
+
         proposals.responseProposals.push(
             ResponseProposal(
                 attestation.responseCID,
                 attestationData,
-                firstBlockNumber
+                firstBlockNumber,
+                indexerStake
             )
         );
 
-        // update stake values
-        proposals
-            .stake[attestation.responseCID]
-            .accountStake[attestationIndexer]
-            .attestationStake = indexerStake;
-
-        proposals.stake[attestation.responseCID].totalStake.attestationStake =
-            proposals
-                .stake[attestation.responseCID]
-                .totalStake
-                .attestationStake +
-            indexerStake;
-
-        proposals.totalStake.attestationStake =
-            proposals.totalStake.attestationStake +
-            indexerStake;
+        // TODO: Check if this is secure, maybe we don't actually care about the total stake
+        // update total stake values
+        proposals.totalStake += indexerStake;
 
         // loop over all of the responseProposals and check if the responseCID is equal for all of them, if not open a new conflict
         for (uint256 i; i < proposals.responseProposals.length; i++) {
             bytes32 _responseCID = proposals.responseProposals[i].responseCID;
-            bytes memory _attestationData = proposals
-                .responseProposals[i]
-                .attestationData;
             if (attestation.responseCID != _responseCID) {
                 // create a query dispute
                 createQueryDispute(
-                    subgraphBridgeID, //subgraphBridgeID
-                    attestation.requestCID, // requestCID
-                    attestation.responseCID, //responseCID of this proposal
-                    _responseCID, //responseCID of the conflicting proposal
+                    subgraphBridgeID,
+                    attestation.requestCID,
                     i, // index of the conflicting proposal
                     proposals.responseProposals.length - 1 // index of the submitted proposal
                 );
             }
         }
 
+        uint256 unlocksAt = firstBlockNumber +
+            subgraphBridges[subgraphBridgeID].proposalFreezePeriod;
+
         emit SubgraphResponseAdded(
             msg.sender,
             subgraphBridgeID,
             attestation.subgraphDeploymentID,
             response,
-            attestationData
+            attestationData,
+            unlocksAt,
+            attestation.requestCID
         );
     }
 
-    //@notice, this function allows you to use a non disputed query response after the dispute period has ended
-    //@dummy, use this function to slurp up your query data
+    /**
+     *@notice this function allows you to use a non disputed query response after the dispute period has ended
+     *@param subgraphBridgeID, the ID of the subgraph bridge
+     *@param response, the response of the query
+     *@param attestationData, the attestation of the response
+     */
+
     function certifySubgraphResponse(
-        bytes32 _blockhash,
-        bytes32 subgraphBridgeId,
+        bytes32 subgraphBridgeID,
         string calldata response,
         bytes calldata attestationData // contains cid of response and request
     ) public {
@@ -193,25 +222,23 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         );
         bytes32 requestCID = attestation.requestCID;
         require(
-            !isQueryDisputed(attestation.requestCID),
+            !isQueryDisputed(subgraphBridgeID, attestation.requestCID),
             "certifySubgraphResponse: There is a query dispute for this request"
         );
 
-        uint208 proposalFreezePeriod = subgraphBridges[subgraphBridgeId]
+        uint208 proposalFreezePeriod = subgraphBridges[subgraphBridgeID]
             .proposalFreezePeriod;
 
-        uint8 minimumSlashableGRT = subgraphBridges[subgraphBridgeId]
+        uint256 minimumSlashableGRT = subgraphBridges[subgraphBridgeID]
             .minimumSlashableGRT;
 
         SubgraphBridgeProposals storage proposals = subgraphBridgeProposals[
-            subgraphBridgeId
+            subgraphBridgeID
         ][requestCID];
 
-        //TODO: SANITY CHECK THIS AND SEE IF WE MEAN EQUAL TO GREATER THAN OR EQUAL TO
-        // require(proposals.proposalCount == 1, "proposalCount must be 1");
         require(
-            proposals.proposalCount >= 1,
-            "proposalCount must be at least 1"
+            proposals.responseProposals.length >= 1,
+            "proposal count must be at least 1"
         );
 
         uint256 proposalFirstBlock = proposals
@@ -223,29 +250,33 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
             "proposal still frozen"
         );
 
-        bytes32 responseCID = keccak256(abi.encodePacked(response));
+        // TODO: Double check this
+        require(proposals.totalStake > minimumSlashableGRT, "not enough stake");
 
-        require(
-            proposals.stake[responseCID].totalStake.attestationStake >
-                minimumSlashableGRT,
-            "not enough stake"
-        );
+        _extractData(subgraphBridgeID, requestCID, response);
 
-        _extractData(subgraphBridgeId, requestCID, response);
-        emit QueryResultFinalized(subgraphBridgeId, requestCID, response);
+        // update the latestSubgraphBridgeData
+        latestSubgraphBridgeData[subgraphBridgeID] = subgraphBridgeData[
+            subgraphBridgeID
+        ][requestCID];
+
+        emit QueryResultFinalized(subgraphBridgeID, requestCID, response);
     }
 
     // ============================================================
     // INTERNAL AND HELPER FUNCTIONS
     // ============================================================
 
-    // takes in a subgraphBridgeID and the index of two proposals
-    // and opens a dispute for the two proposals if different
+    /**
+     *@notice this function is used to open a dispute for two conflicting proposals
+     *@param subgraphBridgeID, the ID of the subgraph bridge
+     *@param requestCID, the CID of the request
+     *@param attestationIndex1, the index of the attestation for the first response within subgraphBridgeProposals
+     *@param attestationIndex2, the index of the attestation for the second response within subgraphBridgeProposals
+     */
     function createQueryDispute(
         bytes32 subgraphBridgeID,
         bytes32 requestCID,
-        bytes32 responseCID1,
-        bytes32 responseCID2,
         uint256 attestationIndex1,
         uint256 attestationIndex2
     ) internal returns (bytes32 disputeID1, bytes32 disputeID2) {
@@ -258,14 +289,16 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
             subgraphBridgeID
         ][requestCID];
 
-        require(
-            proposals.stake[responseCID1].totalStake.attestationStake > 0,
-            "responseCID1 doesn't exist"
-        );
-        require(
-            proposals.stake[responseCID2].totalStake.attestationStake > 0,
-            "responseCID2 doesn't exist"
-        );
+        bytes32 responseCID1 = proposals
+            .responseProposals[attestationIndex1]
+            .responseCID;
+
+        bytes32 responseCID2 = proposals
+            .responseProposals[attestationIndex2]
+            .responseCID;
+
+        require(responseCID1 != bytes32(0), "responseCID1 doesn't exist");
+        require(responseCID2 != bytes32(0), "responseCID2 doesn't exist");
 
         require(
             responseCID1 != responseCID2,
@@ -286,18 +319,45 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         ).createQueryDisputeConflict(attestationBytes1, attestationBytes2);
 
         // push the disputeIDs to the disputeID array
-        queryDisputes[requestCID].push(_disputeID1);
-        queryDisputes[requestCID].push(_disputeID2);
+        bytes32[] storage disputes = subgraphBridgeProposals[subgraphBridgeID][
+            requestCID
+        ].disputes;
+        disputes.push(_disputeID1);
+        disputes.push(_disputeID2);
 
+        // emit a SubgrapuQueryDisputed event for both disputes
+        emit SubgraphQueryDisputeCreated(
+            subgraphBridgeID,
+            requestCID,
+            _disputeID1
+        );
+
+        emit SubgraphQueryDisputeCreated(
+            subgraphBridgeID,
+            requestCID,
+            _disputeID2
+        );
         return (_disputeID1, _disputeID2);
     }
 
-    // takes in a requestCID and returns if any query is being disputed
-    function isQueryDisputed(bytes32 requestCID) public view returns (bool) {
-        for (uint256 i = 0; i < queryDisputes[requestCID].length; i++) {
+    /**
+     *@notice this function checks if a query is being disputed
+     *@param requestCID the requestCID of the query
+     *@return true if the query is being disputed, false if not
+     */
+    function isQueryDisputed(bytes32 bridgeID, bytes32 requestCID)
+        public
+        view
+        returns (bool)
+    {
+        bytes32[] storage queryDisputes = subgraphBridgeProposals[bridgeID][
+            requestCID
+        ].disputes;
+        for (uint256 i = 0; i < queryDisputes.length; i++) {
             if (
+                // TODO: CHECK THIS FUNCTION AFTER REFACTORING
                 IDisputeManager(theGraphDisputeManager).isDisputeCreated(
-                    queryDisputes[requestCID][i]
+                    queryDisputes[i]
                 )
             ) {
                 return true;
@@ -306,18 +366,29 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         return false;
     }
 
-    // TODO: MAYBE MAKE THIS AN ADMIN FUNCTION?
-    // NOT SURE HOW WE WANT TO HANDLE PEOPLE JUST PINNING RANDOM BLOCKS
-    // since blockhash only returns values for the most recent 256 blocks
-    function pinBlockHash(uint256 blockNumber, bytes32 blockHash) public {
+    /**
+     @notice this function is used to pin a blockhash to a blocknumber
+     @param blockNumber the blocknumber to pin the blockhash to
+     */
+    function pinBlockHash(uint256 blockNumber) public {
         require(
-            pinnedBlocks[blockhash(blockNumber)] == 0,
+            blockNumber > block.number - 256,
+            "Pinned block must be within the last 256 blocks"
+        );
+        require(
+            pinnedBlocks[blockNumber] == 0,
             "pinBlockHash: already pinned!"
         );
-        pinnedBlocks[blockhash(blockNumber)] = blockNumber;
+        pinnedBlocks[blockNumber] = blockhash(blockNumber);
     }
 
-    //TODO: HANDLE ALL DATA TYPES
+    // TODO: Add in a check to get the length of the uint256 from the response string. Probably just checking to see if the last character is a \".
+    /**
+     *@notice this function takes in a subgraphBridgeID, a requestCID, and a responseCID and extracts the data from the responseCID and stores it in the subgraphBridgeData mapping
+     *@param subgraphBridgeID, the ID of the subgraph bridge
+     *@param requestCID, the CID of the request
+     *@param response, the response string from the subgraph
+     */
     function _extractData(
         bytes32 subgraphBridgeID,
         bytes32 requestCID,
@@ -327,24 +398,24 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
             .responseDataType;
 
         if (_type == BridgeDataType.UINT) {
-            subgraphBridgeData[subgraphBridgeID][requestCID] = _uintFromString(
-                response,
-                subgraphBridges[subgraphBridgeID].responseDataOffset
-            );
-        } else if (_type == BridgeDataType.ADDRESS) {
-            //DO SOMETHING ELSE
-            /*
-            subgraphBridgeData[subgraphBridgeID][requestCID] = _addressFromString(
-                response,
-                subgraphBridges[subgraphBridgeID].responseDataOffset
-            );
-            */
-        } else if (_type == BridgeDataType.BYTES32) {
-            //DO ANOTHER THING
-            subgraphBridgeData[subgraphBridgeID][requestCID] = uint256(
-                _bytes32FromString(
+            subgraphBridgeData[subgraphBridgeID][requestCID] = abi.encodePacked(
+                _uintFromString(
                     response,
                     subgraphBridges[subgraphBridgeID].responseDataOffset
+                )
+            );
+        } else if (_type == BridgeDataType.ADDRESS) {
+            subgraphBridgeData[subgraphBridgeID][requestCID] = abi.encodePacked(
+                _addressFromString(
+                    response,
+                    subgraphBridges[subgraphBridgeID].responseDataOffset
+                )
+            );
+        } else if (_type == BridgeDataType.BYTES32) {
+            subgraphBridgeData[subgraphBridgeID][requestCID] = abi.encodePacked(
+                _bytes32FromString(
+                    response,
+                    subgraphBridges[subgraphBridgeID].responseDataOffset + 2 // we are adding 2 to the offset because the response string has a 0x in front of it, and I didn't feel like messing with the algorithm for finding the offset to add an exception for the 0x
                 )
             );
         }

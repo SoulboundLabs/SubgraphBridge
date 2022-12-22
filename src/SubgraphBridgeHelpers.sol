@@ -29,30 +29,18 @@ contract SubgraphBridgeManagerHelpers {
 
     // stored in mapping where (ID == attestation.requestCID)
     struct SubgraphBridgeProposals {
-        // {attestation.responseCID} -> {stake}
-        mapping(bytes32 => BridgeStake) stake;
         ResponseProposal[] responseProposals;
-        BridgeStakeTokens totalStake;
-        uint256 proposalCount;
+        uint256 totalStake; // stake of GRT tokens
+        bytes32[] disputes;
     }
 
     struct ResponseProposal {
         bytes32 responseCID;
         bytes attestationData;
         uint256 proposalBlockNumber;
+        uint256 stake;
     }
 
-    struct BridgeStake {
-        BridgeStakeTokens totalStake;
-        mapping(address => BridgeStakeTokens) accountStake;
-    }
-
-    struct BridgeStakeTokens {
-        uint256 attestationStake; // Slashable GRT staked by indexers via the staking contract
-        uint256 tokenStake; // GRT staked by oracles through Subgraph Bridge contract
-    }
-
-    // TODO: Create a function to decode this data.
     enum BridgeDataType {
         ADDRESS,
         BYTES32,
@@ -61,16 +49,15 @@ contract SubgraphBridgeManagerHelpers {
     }
 
     struct SubgraphBridge {
-        // QUERY AND RESPONSE CONFIG
+        // ---QUERY AND RESPONSE CONFIG---
         bytes queryFirstChunk; // the first bit of the query up to where the blockhash starts
         bytes queryLastChunk; // the last bit of the query from where the blockhash ends to the end of query
         BridgeDataType responseDataType; // data type to be extracted from graphQL response string
         bytes32 subgraphDeploymentID; // subgraph being queried
-        // DISPUTE HANLDING CONFIG
+        // ---DISPUTE HANLDING CONFIG---
         uint208 proposalFreezePeriod; // undisputed queries can only be executed after this many blocks
         uint16 responseDataOffset; // index where the data starts in the response string
-        uint8 minimumSlashableGRT; // minimum slashable GRT staked by indexers in order for undisputed proposal to pass
-        uint8 resolutionThresholdSlashableGRT; // (30-99) percent of slashable GRT required for dispute resolution
+        uint256 minimumSlashableGRT; // minimum slashable GRT staked by indexers in order for undisputed proposal to pass
     }
 
     function _subgraphBridgeID(SubgraphBridge memory subgraphBridge)
@@ -94,36 +81,10 @@ contract SubgraphBridgeManagerHelpers {
 
     function _uintFromString(string calldata str, uint256 offset)
         public
-        view
+        pure
         returns (uint256)
     {
-        (uint256 val, ) = _uintFromByteString(bytes(str), offset);
-        return val;
-    }
-
-    // takes a full query string or response string and extracts a uint of unknown length beginning at the specified index
-    function _uintFromByteString(bytes memory bString, uint256 offset)
-        public
-        view
-        returns (uint256 value, uint256 depth)
-    {
-        bytes1 char = bString[offset];
-        bool isEscapeChar = (char == 0x7D || char == 0x2C || char == 0x22); // ,}"
-        if (isEscapeChar) {
-            return (0, 0);
-        }
-
-        bool isDigit = (uint8(char) >= 48) && (uint8(char) <= 57); // 0-9
-        require(isDigit, "invalid char");
-
-        (uint256 trailingVal, uint256 trailingDepth) = _uintFromByteString(
-            bString,
-            offset + 1
-        );
-        return (
-            trailingVal + (uint8(char) - 48) * 10**(trailingDepth),
-            trailingDepth + 1
-        );
+        return st2num(str[offset:]);
     }
 
     // Convert an hexadecimal character to raw byte
@@ -253,5 +214,42 @@ contract SubgraphBridgeManagerHelpers {
                 toHex16(bytes16(data)),
                 toHex16(bytes16(data << 128))
             );
+    }
+
+    function _addressFromString(string memory str, uint256 start)
+        public
+        pure
+        returns (address)
+    {
+        bytes memory b = bytes(str);
+        uint256 result = 0;
+        for (uint256 i = start; i < 42; i++) {
+            uint256 c = uint8(b[i]);
+            if (c >= 48 && c <= 57) {
+                result = result * 16 + (c - 48);
+            }
+            if (c >= 65 && c <= 70) {
+                result = result * 16 + (c - 55);
+            }
+            if (c >= 97 && c <= 102) {
+                result = result * 16 + (c - 87);
+            }
+        }
+
+        return address(uint160(result));
+    }
+
+    function st2num(string memory numString) public pure returns (uint256) {
+        uint256 val = 0;
+        bytes memory stringBytes = bytes(numString);
+        for (uint256 i = 0; i < stringBytes.length; i++) {
+            uint256 exp = stringBytes.length - i;
+            bytes1 ival = stringBytes[i]; // the char byte
+            uint8 uval = uint8(ival); // the char byte as a uint8
+            uint256 jval = uval - uint256(0x30); // the char byte as a uint8 minus 0x30
+
+            val += (uint256(jval) * (10**(exp - 1))); // multiply by the appropriate power of 10
+        }
+        return val;
     }
 }

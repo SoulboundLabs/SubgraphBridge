@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 pragma abicoder v2;
 
-import "./dependencies/TheGraph/IDisputeManager.sol";
+import "../dependencies/TheGraph/IDisputeManager.sol";
 
 contract MockDispute {
     bool public disputed1 = false;
