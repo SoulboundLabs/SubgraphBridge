@@ -9,7 +9,7 @@ import "./SubgraphBridgeHelpers.sol";
 /**
  * @title SubgraphBridge
  * @dev SubgraphBridge is a contract that allows us to bridge subgraph data from The Graph's Decentralized Network to Ethereum in a cryptoeconomically secure manner.
- * @author Soulbound Labs (Connor Dunham, Alexander Gusev, and Jordan Rein)
+ * @author Soulbound Labs (Alexander Gusev, Connor Dunham, and Jordan Rein)
  */
 contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
     address public theGraphStaking;
@@ -18,8 +18,6 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
     /**
     @notice A mapping storing blockhashes -> blocknumber
     */
-    // mapping(bytes32 => uint256) public pinnedBlocks;
-
     mapping(uint256 => bytes32) public pinnedBlocks;
 
     /**
