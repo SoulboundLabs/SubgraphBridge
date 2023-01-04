@@ -1,3 +1,11 @@
+## Useful Diagrams
+
+Visual Diagram of data structure
+![Data Structure](BridgeDataStructure.png)
+
+Visual Diagram of using the Bridge
+![Bridge Use Flow](BridgeUseFlow.png)
+
 ## How to use the SubgraphBridge
 
 The SubgraphBridgeManager contract allows a user to create a Subgraph Bridge. This allows for the bridging of a subgraph query result back on chain in a configurably optimistic manner.
