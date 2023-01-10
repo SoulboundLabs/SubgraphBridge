@@ -43,4 +43,6 @@ interface ISubgraphBridge {
         external
         view
         returns (BridgeDataType);
+
+    function latestSubgraphBridgeData(bytes32 bridgeID) external returns (bytes memory);
 }
