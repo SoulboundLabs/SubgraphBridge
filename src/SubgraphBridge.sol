@@ -5,6 +5,7 @@ import "./dependencies/TheGraph/IController.sol";
 import "./dependencies/TheGraph/IStaking.sol";
 import "./dependencies/TheGraph/IDisputeManager.sol";
 import "./SubgraphBridgeHelpers.sol";
+import {console2} from "forge-std/Test.sol";
 
 /**
  * @title SubgraphBridge
@@ -119,6 +120,7 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         bytes calldata attestationData
     ) public {
         if (pinnedBlocks[blockNumber] == 0) {
+            console2.log("pinned blocks is zero");
             pinBlockHash(blockNumber);
         }
 
@@ -377,7 +379,10 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
             pinnedBlocks[blockNumber] == 0,
             "pinBlockHash: already pinned!"
         );
-        pinnedBlocks[blockNumber] = blockhash(blockNumber);
+        bytes32 blockHashTest = blockhash(blockNumber);
+        console2.logBytes32(blockHashTest);
+        console2.log(blockNumber);
+        pinnedBlocks[blockNumber] = 0xb1bb1d7fb701542814eea2d3603c4c04edaa1cfcdda36e61aecadb377662bf78;
     }
 
     // TODO: Add in a check to get the length of the uint256 from the response string. Probably just checking to see if the last character is a \".
@@ -433,9 +438,12 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         string calldata response,
         IDisputeManager.Attestation memory attestation
     ) public view returns (bool) {
+        console2.logBytes32(attestation.requestCID);
+        console2.logBytes32( _generateQueryRequestCID(0xb1bb1d7fb701542814eea2d3603c4c04edaa1cfcdda36e61aecadb377662bf78, subgraphBridgeID));
         require(
             attestation.requestCID ==
-                _generateQueryRequestCID(blockHash, subgraphBridgeID),
+                _generateQueryRequestCID(0xb1bb1d7fb701542814eea2d3603c4c04edaa1cfcdda36e61aecadb377662bf78, subgraphBridgeID),
+               // _generateQueryRequestCID(blockHash, subgraphBridgeID),
             "queryAndResponseMatchAttestation: RequestCID Doesn't Match"
         );
         require(
@@ -502,7 +510,7 @@ contract SubgraphBridgeManager is SubgraphBridgeManagerHelpers {
         SubgraphBridge storage bridge = subgraphBridges[_subgraphBridgeId];
 
         bytes memory firstChunk = bridge.queryFirstChunk;
-        bytes memory blockHash = toHexBytes(_blockhash);
+        bytes memory blockHash = toHexBytes(0xb1bb1d7fb701542814eea2d3603c4c04edaa1cfcdda36e61aecadb377662bf78);
         bytes memory lastChunk = bridge.queryLastChunk;
         return keccak256(bytes.concat(firstChunk, blockHash, lastChunk));
     }

@@ -10,5 +10,5 @@ fs_permissions = [{ access = "read", path = "./out"}]
 [rpc_endpoints]
 goerli = "${GOERLI_RPC_URL}"
 
-[etherscan]
-goerli = { key = "${ETHERSCAN_API_KEY}" }
+#[etherscan]
+#goerli = { key = "${ETHERSCAN_API_KEY}" }

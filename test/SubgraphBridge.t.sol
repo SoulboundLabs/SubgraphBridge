@@ -2,6 +2,7 @@
 pragma solidity ^0.8.13;
 pragma abicoder v2;
 
+import "forge-std/Vm.sol";
 import "forge-std/Test.sol";
 import "../src/SubgraphBridge.sol";
 import "../src/dependencies/TheGraph/IDisputeManager.sol";
@@ -16,29 +17,36 @@ contract SubgraphBridgeTest is Test {
         hex"7b227175657279223a227b5c6e2020626f6e6465724164646564732866697273743a2031302c20626c6f636b3a207b686173683a205c22";
     bytes public lastChunk =
         hex"5c227d29207b5c6e2020202069645c6e20207d5c6e7d5c6e222c227661726961626c6573223a7b7d7d";
-    bytes32 public blockHash1 =
-        0xeee517bc8c2cdaf7b1a122161223fd9d29d25f9250b071c964d508c5a9cb0ee3;
-    uint256 public blockNumber1 = 15984538;
-    bytes32 public subgraphDeploymentId =
-        0xe38339f1ed253e87deacd7d21ada20bb414fa9958d3ddd80f1e39aa724f76224;
+    // bytes32 public blockHash1 =
+    //     0xeee517bc8c2cdaf7b1a122161223fd9d29d25f9250b071c964d508c5a9cb0ee3;
+    bytes32 public blockHash1 = 0xb1bb1d7fb701542814eea2d3603c4c04edaa1cfcdda36e61aecadb377662bf78;
+    uint256 public blockNumber1 = 187790336;
+    bytes32 public subgraphDeploymentId = 0x13ac05d684e410ba8cddd8071bf10625cea68aef392869ed00d2f99511e1b681;
 
-    bytes32 public requestCID1 =
-        0x200d785a4e650a6d55daec459392da7c1e22a3304710221a0b807e2260626aca;
-    bytes32 public responseCID1 =
-        0x2ba2ff1138e3b6b95ca8ddc5fdeb67604ba15e35571f4e0adaa7b3a6e7d80284;
+    // bytes32 public requestCID1 =
+    //     0x200d785a4e650a6d55daec459392da7c1e22a3304710221a0b807e2260626aca;
+    bytes32 public requestCID1 = 0x42a1d43adc2cfe2b6ad5ce6d67050fe9ff7b802643bb430129cfae66fc7a4513;
+
+    bytes32 public responseCID1 = 0xb906bbe7f925398dc40fa24c50bd924b460cc7affb2b9d733429d41bf6b3d7a8;
+        
 
     // @notice Attestation Data
     bytes32 public r =
-        0xc67476e32e2121de62e78558392246c6b48e7ce505a051b40694ebf6a929bbb7;
+        0xd02535771e343077148fa9d71081f20278df24e2afcf7344da84127b776abe20;
     bytes32 public s =
-        0x2c3c887a657777cdf5f907fc48fc92f229a60ce9bad7b27f1ed4819dbaa7c38f;
+       0x1975521845c813f13bb07cb3e4a26db4fb1058c67a67805310f4c79ddf76c392;
     uint8 public v = 28;
 
-    string public response1 =
-        '{"data":{"bonderAddeds":[{"id":"0x044e86abf512ff8914f03da2d6ac41725b0ad09e56cef7326bb5ca4a173f35db60"},{"id":"0x0a9209bfa2cfe74d7b81901c422766d65b43c2452ebe3c99319d14cad5a78301127"},{"id":"0x0f3f94aad9213eccee4540428c1cc0a315ce92b25af8dfe9d48b49dbb33a09a1111"},{"id":"0x2ca87cf0eb5259ca22cd015e6d5f25b92800a98d665d3ad009920da2c38020c2107"},{"id":"0x3aef54912826dfad2198871f1cd1083cc59cd5987f36019dc3cfb0c9d01faf2716"},{"id":"0x3eb7e67c64e6f1b2b130ff3b718f7b80634b090fb830d1463c76b5be7325044e88"},{"id":"0x3eb7e67c64e6f1b2b130ff3b718f7b80634b090fb830d1463c76b5be7325044e89"},{"id":"0x5e39acf2fbfaf76f862da9d5cb631984d79b1f9c5ed53d4935990cce32e8b618136"},{"id":"0x6cb5869dac39393c4717439eb4a49e5f0ea12fb466f2d18a1bfa10de307cf83942"},{"id":"0x889eee552461cff761f2954834adbc1e6714c6ec7bb74e6d4c84049fc7a6d9fc15"}]}}';
+    string public response1 = '{"data":{"deposit":{"collateral":"2000000000000000000"}}}';
 
+        
+
+    // string public response1 = '{"data":{"outboxEntries":[],"outboxOutputs":[{"id":"0x00081e32a232df4807ea4c7fc55fe066488451eb168226b692310aa587b7599e-107","destAddr":"0x67b5504e212131241014e9ce952bfee8389ef391","l2Sender":"0x67b5504e212131241014e9ce952bfee8389ef391","path":"10660"},{"id":"0x000cc08669e83a2be52a6cdcf11f5023f0acfa510dad0696c4c6963d25c3c0e9-119","destAddr":"0x32b6bb6526216e53f2f4df700ee872bed90c8335","l2Sender":"0x32b6bb6526216e53f2f4df700ee872bed90c8335","path":"14310"},{"id":"0x000d5de27eb1e984744868e290b2642e56fed4bc64e2cb2e3be4d017e302c985-20","destAddr":"0x8d68c89b98f18820d6c020c561384467901014d5","l2Sender":"0x8d68c89b98f18820d6c020c561384467901014d5","path":"12286"},{"id":"0x0014379278fc961f7025d9f3697baa5c488cb9c980635dde2076062e4c1f1f17-33","destAddr":"0x91d7cf4b01eb26b0348560dfc60377b55e87bc5e","l2Sender":"0x91d7cf4b01eb26b0348560dfc60377b55e87bc5e","path":"16085"},{"id":"0x0017568be5b426c8c375213ae670d8350fa32fb69bd35ecc01329ee2cf00939b-165","destAddr":"0x518e3acd5e3af36daa02999cd8c656b11413f31f","l2Sender":"0x518e3acd5e3af36daa02999cd8c656b11413f31f","path":"16635"}]}}';
+
+    
     bytes32 public extractedResponseData =
-        0x044e86abf512ff8914f03da2d6ac41725b0ad09e56cef7326bb5ca4a173f35db;
+         0x7b646174613a207b6465706f7369743a207b636f6c6c61746572616c3a200000;
+         //0x044e86abf512ff8914f03da2d6ac41725b0ad09e56cef7326bb5ca4a173f35db;
 
     bytes attestationBytes =
         abi.encodePacked(
@@ -63,12 +71,19 @@ contract SubgraphBridgeTest is Test {
 
     bytes32 public bridgeId;
 
-    // vitalik address for testing
+    // vitalik address for testing and Arbitrum sepolia contracts
+   
+     address staking = 0x00669A4CF01450B64E8A2A20E9b1FCB71E61eF03;
+
+     address dispute = 0x0Ab2B043138352413Bb02e67E626a70320E3BD46;
+
     address public vitalik = 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045;
 
-    address staking = 0xF55041E37E12cD407ad00CE2910B8269B01263b9;
+    // mainnet
 
-    address dispute = 0x97307b963662cCA2f7eD50e38dCC555dfFc4FB0b;
+    // address staking = 0xF55041E37E12cD407ad00CE2910B8269B01263b9;
+
+    // address dispute = 0x97307b963662cCA2f7eD50e38dCC555dfFc4FB0b;
 
     function setUp() public {
         bridge = new SubgraphBridgeManager(staking, dispute);
@@ -88,11 +103,15 @@ contract SubgraphBridgeTest is Test {
         bridgeId = bridge._subgraphBridgeID(sampleBridge);
 
         bridge.pinBlockHash(blockNumber1);
+
+        bytes32 newBlockHash = blockhash(blockNumber1);
+        console2.logBytes32(newBlockHash);
+        console2.logBytes32(bridge._generateQueryRequestCID(newBlockHash, bridgeId));
     }
 
     function testIfDeployed() public view {
         assert(
-            0xF55041E37E12cD407ad00CE2910B8269B01263b9 ==
+             0x865365C425f3A593Ffe698D9c4E6707D14d51e08 ==
                 bridge.theGraphStaking()
         );
     }
@@ -328,7 +347,6 @@ contract SubgraphBridgeTest is Test {
         MockDispute(dispute).disputeResolve();
 
         vm.roll(block.number + 100);
-
         // this should work because there isn't a dispute open
         bridge.certifySubgraphResponse(bridgeId, response1, attestationBytes);
     }
